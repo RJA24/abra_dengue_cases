@@ -213,24 +213,30 @@ with tab3:
     st.subheader("Geographic Heatmap of Dengue Cases")
     
     map_data = filtered_df.groupby("Muncity").size().reset_index(name="Total Cases")
-    
-    # Clean the Muncity names to match the geojson Standard_Name (uppercase and stripped)
     map_data["Muncity"] = map_data["Muncity"].astype(str).str.strip().str.upper()
     
     abra_geojson = fetch_abra_geojson()
     
     if abra_geojson:
-        fig_map = px.choropleth(
+        # Replaced px.choropleth with px.choropleth_mapbox
+        fig_map = px.choropleth_mapbox(
             map_data,
             geojson=abra_geojson,
             locations='Muncity',
             featureidkey='properties.Standard_Name', 
             color='Total Cases',
             color_continuous_scale="Reds",
+            mapbox_style="carto-positron", # Clean, professional light basemap
+            zoom=8.5, # Adjust zoom to fit Abra
+            center={"lat": 17.58, "lon": 120.83}, # Approximate center coordinates of Abra
+            opacity=0.8,
             title="Dengue Case Distribution across Abra",
             labels={'Total Cases': 'Case Count'}
         )
-        fig_map.update_geos(fitbounds="locations", visible=False)
+        
+        # Remove margins so the map fills the container nicely
+        fig_map.update_layout(margin={"r":0,"t":40,"l":0,"b":0})
+        
         st.plotly_chart(fig_map, use_container_width=True)
     else:
         st.error("Could not fetch the Abra geographic boundaries from the provided URLs.")
