@@ -22,28 +22,9 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    div[data-testid="metric-container"] {
-        background-color: #ffffff;
-        border: 1px solid #e2e8f0;
-        padding: 24px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        text-align: center;
-        transition: transform 0.2s ease-in-out;
-    }
-    div[data-testid="metric-container"]:hover {
-        transform: translateY(-5px);
-    }
-    div[data-testid="metric-container"] label {
-        font-size: 1.1rem !important;
-        color: #64748b !important;
-        font-weight: 600 !important;
-        margin-bottom: 0.5rem;
-    }
-    div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
-        font-size: 2.75rem !important;
-        color: #0f172a !important;
-        font-weight: 800 !important;
+    /* Ensure charts have breathing room */
+    .js-plotly-plot {
+        margin-bottom: 2rem;
     }
     
     h1, h2, h3 {
@@ -54,10 +35,13 @@ st.markdown("""
 
 # --- Helper Function for Map Matching ---
 def normalize_name(name):
-    """Strips special characters, spaces, and hyphens for a 100% geographic match."""
+    """Strips special characters, spaces, hyphens, and parentheses for a 100% geographic match."""
     if not isinstance(name, str):
         return ""
     name = name.upper().replace("Ñ", "N")
+    # Remove contents inside parentheses e.g., "Licuan-Baay (Licuan)" -> "Licuan-Baay"
+    name = re.sub(r'\(.*?\)', '', name)
+    # Remove everything that is not a letter
     return re.sub(r'[^A-Z]', '', name)
 
 # --- Data & GeoJSON Loading ---
@@ -115,14 +99,9 @@ df = load_data()
 
 # --- Sidebar Elements ---
 with st.sidebar:
-    st.markdown("### Data Management")
-    if st.button("Refresh Data", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
-        
-    st.markdown("---")
+    st.markdown("### Surveillance Filters")
     
-    with st.expander("Surveillance Filters", expanded=True):
+    with st.expander("Filter Options", expanded=True):
         muncity_filter = st.multiselect(
             "Select Municipality:", 
             options=sorted(df["Muncity"].dropna().unique()), 
@@ -134,6 +113,12 @@ with st.sidebar:
             options=df["Sex"].dropna().unique(), 
             default=df["Sex"].dropna().unique()
         )
+        
+    st.markdown("---")
+    st.markdown("### Data Management")
+    if st.button("Refresh Data", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 
 # Apply filters
 filtered_df = df.query("Muncity in @muncity_filter & Sex in @sex_filter")
@@ -143,16 +128,31 @@ st.title("Abra PESU: Dengue Surveillance Dashboard")
 st.markdown("**Provincial Epidemiology and Surveillance Unit - Official Data Portal**")
 st.markdown("---")
 
-# --- Enhanced Key Metrics ---
+# --- KPI Cards (Custom HTML implementation) ---
 total_cases = len(filtered_df)
 total_deaths = len(filtered_df[filtered_df["Outcome"] == "D"])
 avg_age = round(filtered_df["AgeYears"].mean(), 1) if not filtered_df.empty else 0
+affected_muni = filtered_df["Muncity"].nunique()
+
+def create_kpi_card(title, value, border_color):
+    return f"""
+    <div style="background-color: #ffffff; padding: 20px; border-radius: 10px; 
+                box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; 
+                border-left: 6px solid {border_color}; text-align: center; height: 100%;">
+        <p style="margin: 0; font-size: 1.05rem; color: #64748b; font-weight: 600;">{title}</p>
+        <h2 style="margin: 10px 0 0 0; font-size: 2.5rem; color: #0f172a; font-weight: 800;">{value}</h2>
+    </div>
+    """
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Confirmed Cases", f"{total_cases:,}")
-col2.metric("Total Fatalities", f"{total_deaths:,}")
-col3.metric("Average Age (Years)", avg_age)
-col4.metric("Affected Municipalities", filtered_df["Muncity"].nunique())
+with col1:
+    st.markdown(create_kpi_card("Total Confirmed Cases", f"{total_cases:,}", "#2563eb"), unsafe_allow_html=True)
+with col2:
+    st.markdown(create_kpi_card("Total Fatalities", f"{total_deaths:,}", "#ef4444"), unsafe_allow_html=True)
+with col3:
+    st.markdown(create_kpi_card("Average Age (Years)", avg_age, "#10b981"), unsafe_allow_html=True)
+with col4:
+    st.markdown(create_kpi_card("Affected Municipalities", affected_muni, "#f59e0b"), unsafe_allow_html=True)
 
 st.markdown("<br><br>", unsafe_allow_html=True)
 
@@ -162,64 +162,67 @@ tab1, tab2, tab3, tab4 = st.tabs(["Epidemiological Trends", "Demographics & Geog
 plotly_template = "plotly_white"
 
 with tab1:
-    col_left, col_right = st.columns(2)
-    
-    with col_left:
-        cases_by_week = filtered_df.groupby("MorbidityWeek").size().reset_index(name="Case Count")
-        fig_line = px.line(
-            cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, 
-            title="Dengue Morbidity Trend by Week",
-            labels={"MorbidityWeek": "Morbidity Week", "Case Count": "Number of Cases"},
-            template=plotly_template
-        )
-        fig_line.update_traces(line_color='#2563eb', marker=dict(size=8))
-        st.plotly_chart(fig_line, use_container_width=True)
+    # Chart 1: Cases over time (Full width)
+    cases_by_week = filtered_df.groupby("MorbidityWeek").size().reset_index(name="Case Count")
+    fig_line = px.line(
+        cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, 
+        title="Dengue Morbidity Trend by Week",
+        labels={"MorbidityWeek": "Morbidity Week", "Case Count": "Number of Cases"},
+        template=plotly_template
+    )
+    fig_line.update_traces(line_color='#2563eb', marker=dict(size=10))
+    fig_line.update_layout(height=500)
+    st.plotly_chart(fig_line, use_container_width=True)
 
-    with col_right:
-        class_counts = filtered_df["ClinClass"].value_counts().reset_index()
-        class_counts.columns = ["Classification", "Count"]
-        
-        color_map = {
-            "NO WARNING SIGNS": "#10b981", 
-            "WITH WARNING SIGNS": "#f59e0b", 
-            "SEVERE DENGUE": "#ef4444"
-        }
-        
-        fig_pie = px.pie(
-            class_counts, names="Classification", values="Count", hole=0.45, 
-            title="Clinical Case Classification",
-            color="Classification", color_discrete_map=color_map,
-            template=plotly_template
-        )
-        st.plotly_chart(fig_pie, use_container_width=True)
+    st.markdown("---")
+
+    # Chart 2: Clinical Classification (Full width)
+    class_counts = filtered_df["ClinClass"].value_counts().reset_index()
+    class_counts.columns = ["Classification", "Count"]
+    
+    color_map = {
+        "NO WARNING SIGNS": "#10b981", 
+        "WITH WARNING SIGNS": "#f59e0b", 
+        "SEVERE DENGUE": "#ef4444"
+    }
+    
+    fig_pie = px.pie(
+        class_counts, names="Classification", values="Count", hole=0.45, 
+        title="Clinical Case Classification",
+        color="Classification", color_discrete_map=color_map,
+        template=plotly_template
+    )
+    fig_pie.update_layout(height=550)
+    st.plotly_chart(fig_pie, use_container_width=True)
 
 with tab2:
-    col_left, col_right = st.columns(2)
-    
-    with col_left:
-        muncity_counts = filtered_df["Muncity"].value_counts().reset_index()
-        muncity_counts.columns = ["Municipality", "Count"]
-        fig_bar = px.bar(
-            muncity_counts.head(15), x="Municipality", y="Count", 
-            title="Top 15 Municipalities by Case Volume", 
-            text_auto=True,
-            template=plotly_template
-        )
-        fig_bar.update_traces(marker_color='#2563eb')
-        fig_bar.update_layout(xaxis={'categoryorder':'total descending'})
-        st.plotly_chart(fig_bar, use_container_width=True)
+    # Chart 3: Cases by Municipality (Full width)
+    muncity_counts = filtered_df["Muncity"].value_counts().reset_index()
+    muncity_counts.columns = ["Municipality", "Count"]
+    fig_bar = px.bar(
+        muncity_counts, x="Municipality", y="Count", 
+        title="Total Cases per Municipality", 
+        text_auto=True,
+        template=plotly_template
+    )
+    fig_bar.update_traces(marker_color='#2563eb')
+    fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, height=500)
+    st.plotly_chart(fig_bar, use_container_width=True)
 
-    with col_right:
-        fig_hist = px.histogram(
-            filtered_df, x="AgeYears", nbins=15, 
-            title="Age & Sex Demographics", 
-            color="Sex",
-            barmode="group",
-            labels={"AgeYears": "Age (Years)", "count": "Number of Cases"},
-            color_discrete_sequence=["#2563eb", "#ec4899"],
-            template=plotly_template
-        )
-        st.plotly_chart(fig_hist, use_container_width=True)
+    st.markdown("---")
+
+    # Chart 4: Age Distribution (Full width)
+    fig_hist = px.histogram(
+        filtered_df, x="AgeYears", nbins=20, 
+        title="Age & Sex Demographics", 
+        color="Sex",
+        barmode="group",
+        labels={"AgeYears": "Age (Years)", "count": "Number of Cases"},
+        color_discrete_sequence=["#2563eb", "#ec4899"],
+        template=plotly_template
+    )
+    fig_hist.update_layout(height=500)
+    st.plotly_chart(fig_hist, use_container_width=True)
 
 with tab3:
     st.subheader("Geographic Heatmap of Dengue Cases")
@@ -238,16 +241,16 @@ with tab3:
             locations='Join_Key',
             featureidkey='properties.Standard_Name', 
             color='Total Cases',
-            hover_name='Muncity', # Still show the beautiful, proper name on hover
+            hover_name='Muncity',
             color_continuous_scale="Reds",
             mapbox_style="carto-positron",
-            zoom=8.5,
+            zoom=8.8,
             center={"lat": 17.58, "lon": 120.83},
             opacity=0.8,
             title="Dengue Case Distribution across Abra",
             labels={'Total Cases': 'Case Count', 'Join_Key': 'Municipality'}
         )
-        fig_map.update_layout(margin={"r":0,"t":40,"l":0,"b":0})
+        fig_map.update_layout(margin={"r":0,"t":40,"l":0,"b":0}, height=700)
         st.plotly_chart(fig_map, use_container_width=True)
     else:
         st.error("Could not fetch the Abra geographic boundaries from the provided URLs.")
@@ -260,5 +263,6 @@ with tab4:
     st.dataframe(
         filtered_df[display_cols].sort_values("DOnset", ascending=False), 
         use_container_width=True, 
-        hide_index=True
+        hide_index=True,
+        height=600
     )
