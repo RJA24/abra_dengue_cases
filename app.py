@@ -40,7 +40,7 @@ st.markdown("""
     /* Hide Default Streamlit Elements */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
+    header {visibility: visible;}
     
     /* Text Color Fixes */
     h1, h2, h3, h4, h5, h6, span, p, label {
