@@ -105,28 +105,28 @@ def fetch_abra_geojson():
 
 df = load_data()
 
-# --- Sidebar: Filters (Uncollapsed Initially) & Refresh Button Below ---
+# --- Sidebar: Filters & Refresh Button ---
 with st.sidebar:
     st.markdown("### Surveillance Filters")
     
-    # Using explicit container so it starts uncollapsed
-    with st.container():
-        muncity_filter = st.multiselect(
-            "Select Municipality:", 
+    # Placed back inside an expander, initialized as expanded=True
+    with st.expander("Filter Options", expanded=True):
+        muncity_input = st.multiselect(
+            "Select Municipality (Leave blank for all):", 
             options=sorted(df["Muncity"].dropna().unique()), 
-            default=sorted(df["Muncity"].dropna().unique())
+            default=[]
         )
         
-        sex_filter = st.multiselect(
-            "Select Sex:", 
+        sex_input = st.multiselect(
+            "Select Sex (Leave blank for all):", 
             options=df["Sex"].dropna().unique(), 
-            default=df["Sex"].dropna().unique()
+            default=[]
         )
         
-        clin_filter = st.multiselect(
-            "Clinical Classification:",
+        clin_input = st.multiselect(
+            "Clinical Classification (Leave blank for all):",
             options=df["ClinClass"].dropna().unique(),
-            default=df["ClinClass"].dropna().unique()
+            default=[]
         )
         
     st.markdown("---")
@@ -136,7 +136,11 @@ with st.sidebar:
         st.cache_data.clear()
         st.rerun()
 
-# Apply filters
+# --- Apply Filter Logic (Empty = All) ---
+muncity_filter = muncity_input if muncity_input else df["Muncity"].dropna().unique()
+sex_filter = sex_input if sex_input else df["Sex"].dropna().unique()
+clin_filter = clin_input if clin_input else df["ClinClass"].dropna().unique()
+
 filtered_df = df.query("Muncity in @muncity_filter & Sex in @sex_filter & ClinClass in @clin_filter")
 
 # --- Header ---
@@ -184,7 +188,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 plotly_template = "plotly_white"
 
 with tab1:
-    # Morbidity Week Trend (Full-width, 1 Column)
+    # Morbidity Week Trend
     cases_by_week = filtered_df.groupby("MorbidityWeek").size().reset_index(name="Case Count")
     fig_line = px.line(
         cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, 
@@ -196,7 +200,7 @@ with tab1:
     fig_line.update_layout(height=500)
     st.plotly_chart(fig_line, use_container_width=True)
 
-    # Monthly Distribution (Full-width, 1 Column)
+    # Monthly Distribution
     month_counts = filtered_df.groupby("MorbidityMonth").size().reset_index(name="Cases")
     fig_month = px.bar(
         month_counts, x="MorbidityMonth", y="Cases", text_auto=True,
@@ -209,7 +213,7 @@ with tab1:
     st.plotly_chart(fig_month, use_container_width=True)
 
 with tab2:
-    # Municipality Bar Chart (Full-width, 1 Column)
+    # Municipality Bar Chart
     muncity_counts = filtered_df["Muncity"].value_counts().reset_index()
     muncity_counts.columns = ["Municipality", "Count"]
     fig_bar = px.bar(
@@ -222,7 +226,7 @@ with tab2:
     fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, height=500)
     st.plotly_chart(fig_bar, use_container_width=True)
 
-    # Age & Sex Pyramid/Histogram (Full-width, 1 Column)
+    # Age & Sex Pyramid/Histogram
     fig_hist = px.histogram(
         filtered_df, x="AgeYears", nbins=25, 
         title="Age and Sex Distribution of Cases", 
@@ -235,7 +239,7 @@ with tab2:
     fig_hist.update_layout(height=500)
     st.plotly_chart(fig_hist, use_container_width=True)
 
-    # Indigenous Peoples (IP) Distribution (Full-width, 1 Column)
+    # Indigenous Peoples (IP) Distribution
     if 'ipgroup' in filtered_df.columns:
         ip_df = filtered_df['ipgroup'].fillna('Non-IP / Not Specified').value_counts().reset_index()
         ip_df.columns = ['Group', 'Count']
@@ -249,7 +253,7 @@ with tab2:
         st.plotly_chart(fig_ip, use_container_width=True)
 
 with tab3:
-    # Clinical Classification (Full-width, 1 Column)
+    # Clinical Classification
     class_counts = filtered_df["ClinClass"].value_counts().reset_index()
     class_counts.columns = ["Classification", "Count"]
     
@@ -268,7 +272,7 @@ with tab3:
     fig_pie.update_layout(height=500)
     st.plotly_chart(fig_pie, use_container_width=True)
 
-    # Health Facility Type (DRU) (Full-width, 1 Column)
+    # Health Facility Type (DRU)
     if 'DRU' in filtered_df.columns:
         dru_counts = filtered_df["DRU"].fillna("Unspecified").value_counts().reset_index()
         dru_counts.columns = ["Facility Type", "Count"]
@@ -281,7 +285,7 @@ with tab3:
         fig_dru.update_layout(height=450)
         st.plotly_chart(fig_dru, use_container_width=True)
 
-    # Diagnostic Test Type & Results (Full-width, 1 Column)
+    # Diagnostic Test Type & Results
     if 'LabTest' in filtered_df.columns and 'LabRes' in filtered_df.columns:
         lab_counts = filtered_df.groupby(['LabTest', 'LabRes']).size().reset_index(name='Count')
         fig_lab = px.bar(
@@ -295,17 +299,17 @@ with tab3:
 with tab4:
     st.subheader("Geographic Heatmap of Dengue Cases")
     
-    # 1. Start with a baseline of all 27 Abra municipalities with 0 cases
+    # Start with a baseline of all 27 Abra municipalities with 0 cases
     base_df = pd.DataFrame({"Muncity": ALL_ABRA_MUNICIPALITIES, "Base_Cases": 0})
     
-    # 2. Count current filtered cases
+    # Count current filtered cases
     curr_cases = filtered_df.groupby("Muncity").size().reset_index(name="Filtered_Cases")
     
-    # 3. Merge baseline and actuals to ensure 0-case areas (like Langiden) stay visible
+    # Merge baseline and actuals to ensure 0-case areas stay visible
     map_data = pd.merge(base_df, curr_cases, on="Muncity", how="left")
     map_data["Total Cases"] = map_data["Filtered_Cases"].fillna(0).astype(int)
     
-    # 4. Generate normalized join keys
+    # Generate normalized join keys
     map_data["Join_Key"] = map_data["Muncity"].apply(normalize_name)
     
     abra_geojson = fetch_abra_geojson()
