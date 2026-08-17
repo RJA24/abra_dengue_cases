@@ -2,12 +2,13 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import requests
+import re
 
 # --- Page Configuration ---
 st.set_page_config(
     page_title="Abra PESU | Dengue Surveillance", 
     layout="wide", 
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 # --- Custom CSS for a Professional UI ---
@@ -51,10 +52,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Header ---
-st.title("Abra PESU: Dengue Surveillance Dashboard")
-st.markdown("**Provincial Epidemiology and Surveillance Unit - Official Data Portal**")
-st.markdown("---")
+# --- Helper Function for Map Matching ---
+def normalize_name(name):
+    """Strips special characters, spaces, and hyphens for a 100% geographic match."""
+    if not isinstance(name, str):
+        return ""
+    name = name.upper().replace("Ñ", "N")
+    return re.sub(r'[^A-Z]', '', name)
 
 # --- Data & GeoJSON Loading ---
 @st.cache_data(ttl=600)
@@ -96,9 +100,8 @@ def fetch_abra_geojson():
                                 muni_name = props_upper[k]
                                 break
                                 
-                        clean_name = str(muni_name).strip().upper()
-                        
-                        feature['properties']['Standard_Name'] = clean_name
+                        # Use the normalizer to clean the geojson properties
+                        feature['properties']['Standard_Name'] = normalize_name(muni_name)
                         abra_features.append(feature)
                 
                 if abra_features:
@@ -110,18 +113,22 @@ def fetch_abra_geojson():
 
 df = load_data()
 
-# --- Hidden/Collapsible Filters ---
-with st.expander("Surveillance Filters", expanded=False):
-    col_filter1, col_filter2 = st.columns(2)
+# --- Sidebar Elements ---
+with st.sidebar:
+    st.markdown("### Data Management")
+    if st.button("Refresh Data", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+        
+    st.markdown("---")
     
-    with col_filter1:
+    with st.expander("Surveillance Filters", expanded=True):
         muncity_filter = st.multiselect(
             "Select Municipality:", 
             options=sorted(df["Muncity"].dropna().unique()), 
             default=sorted(df["Muncity"].dropna().unique())
         )
-    
-    with col_filter2:
+        
         sex_filter = st.multiselect(
             "Select Sex:", 
             options=df["Sex"].dropna().unique(), 
@@ -130,6 +137,11 @@ with st.expander("Surveillance Filters", expanded=False):
 
 # Apply filters
 filtered_df = df.query("Muncity in @muncity_filter & Sex in @sex_filter")
+
+# --- Header ---
+st.title("Abra PESU: Dengue Surveillance Dashboard")
+st.markdown("**Provincial Epidemiology and Surveillance Unit - Official Data Portal**")
+st.markdown("---")
 
 # --- Enhanced Key Metrics ---
 total_cases = len(filtered_df)
@@ -213,30 +225,29 @@ with tab3:
     st.subheader("Geographic Heatmap of Dengue Cases")
     
     map_data = filtered_df.groupby("Muncity").size().reset_index(name="Total Cases")
-    map_data["Muncity"] = map_data["Muncity"].astype(str).str.strip().str.upper()
+    
+    # Create a normalized join key to match the GeoJSON exactly
+    map_data["Join_Key"] = map_data["Muncity"].apply(normalize_name)
     
     abra_geojson = fetch_abra_geojson()
     
     if abra_geojson:
-        # Replaced px.choropleth with px.choropleth_mapbox
         fig_map = px.choropleth_mapbox(
             map_data,
             geojson=abra_geojson,
-            locations='Muncity',
+            locations='Join_Key',
             featureidkey='properties.Standard_Name', 
             color='Total Cases',
+            hover_name='Muncity', # Still show the beautiful, proper name on hover
             color_continuous_scale="Reds",
-            mapbox_style="carto-positron", # Clean, professional light basemap
-            zoom=8.5, # Adjust zoom to fit Abra
-            center={"lat": 17.58, "lon": 120.83}, # Approximate center coordinates of Abra
+            mapbox_style="carto-positron",
+            zoom=8.5,
+            center={"lat": 17.58, "lon": 120.83},
             opacity=0.8,
             title="Dengue Case Distribution across Abra",
-            labels={'Total Cases': 'Case Count'}
+            labels={'Total Cases': 'Case Count', 'Join_Key': 'Municipality'}
         )
-        
-        # Remove margins so the map fills the container nicely
         fig_map.update_layout(margin={"r":0,"t":40,"l":0,"b":0})
-        
         st.plotly_chart(fig_map, use_container_width=True)
     else:
         st.error("Could not fetch the Abra geographic boundaries from the provided URLs.")
