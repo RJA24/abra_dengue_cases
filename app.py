@@ -33,7 +33,7 @@ st.markdown("""
     
     /* Padding & Layout Adjustments */
     .block-container {
-        padding-top: 1.5rem;
+        padding-top: 1rem;
         padding-bottom: 2rem;
     }
     
