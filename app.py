@@ -8,11 +8,16 @@ st.title("🦟 Abra Dengue Cases Dashboard")
 st.markdown("Interactive dashboard for Dengue cases in Abra as of August 13, 2026.")
 
 # --- Load Data ---
-@st.cache_data
+@st.cache_data(ttl=600)  # Caches the data for 10 minutes before pulling fresh data
 def load_data():
-    # Load the specific sheet 'ABRA' from the Excel file
-    filepath = "ABRA_DENGUE cases as of August 13, 2026.xlsx"
-    df = pd.read_excel(filepath, sheet_name="ABRA")
+    # The Google Sheet ID extracted from your URL
+    sheet_id = "1IHdlNfzNtBAOk3LlDN2LstxlRmoGQNTRgF7vZ2P_t4U"
+    
+    # Construct the export URL to read the sheet as a CSV
+    csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+    
+    # Read directly into a pandas dataframe
+    df = pd.read_csv(csv_url)
     return df
 
 df = load_data()
