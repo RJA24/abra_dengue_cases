@@ -27,7 +27,7 @@ st.markdown("""
     
     /* Sidebar Styling */
     section[data-testid="stSidebar"] {
-        background-color: #0f172a !important;
+        background-color: #f8fafc !important;
         border-right: 1px solid #e2e8f0;
     }
     
