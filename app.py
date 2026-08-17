@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import json
+import requests
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -13,17 +13,14 @@ st.set_page_config(
 # --- Custom CSS for a Professional UI ---
 st.markdown("""
     <style>
-    /* Adjust top padding */
     .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;
     }
-    /* Hide default Streamlit elements */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* Enhanced KPI Metric Cards */
     div[data-testid="metric-container"] {
         background-color: #ffffff;
         border: 1px solid #e2e8f0;
@@ -48,7 +45,6 @@ st.markdown("""
         font-weight: 800 !important;
     }
     
-    /* Custom header text color */
     h1, h2, h3 {
         color: #1e293b;
     }
@@ -60,7 +56,7 @@ st.title("Abra PESU: Dengue Surveillance Dashboard")
 st.markdown("**Provincial Epidemiology and Surveillance Unit - Official Data Portal**")
 st.markdown("---")
 
-# --- Load Data ---
+# --- Data & GeoJSON Loading ---
 @st.cache_data(ttl=600)
 def load_data():
     sheet_id = "1IHdlNfzNtBAOk3LlDN2LstxlRmoGQNTRgF7vZ2P_t4U"
@@ -70,6 +66,47 @@ def load_data():
     if 'DOnset' in df.columns:
         df['DOnset'] = pd.to_datetime(df['DOnset'], errors='coerce')
     return df
+
+@st.cache_data(ttl="24h")
+def fetch_abra_geojson():
+    urls = [
+        "https://raw.githubusercontent.com/macoymejia/geojsonph/master/MuniCities/MuniCities.json",
+        "https://raw.githubusercontent.com/faeldon/philippines-json-maps/master/2023/geojson/municities-lowres.json"
+    ]
+    
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'} 
+    
+    for url in urls:
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                abra_features = []
+                
+                for feature in data.get('features', []):
+                    props = feature.get('properties', {})
+                    props_upper = {str(k).upper(): str(v).upper() for k, v in props.items()}
+                    
+                    if 'ABRA' in props_upper.values():
+                        muni_keys = ['ADM3_EN', 'NAME_3', 'MUN_NAME', 'NAME_2', 'MUNICIPALITY']
+                        muni_name = ""
+                        
+                        for k in muni_keys:
+                            if k in props_upper and props_upper[k] not in ['ABRA', 'PHILIPPINES']:
+                                muni_name = props_upper[k]
+                                break
+                                
+                        clean_name = str(muni_name).strip().upper()
+                        
+                        feature['properties']['Standard_Name'] = clean_name
+                        abra_features.append(feature)
+                
+                if abra_features:
+                    return {"type": "FeatureCollection", "features": abra_features}
+        except Exception:
+            continue 
+            
+    return None
 
 df = load_data()
 
@@ -175,20 +212,19 @@ with tab2:
 with tab3:
     st.subheader("Geographic Heatmap of Dengue Cases")
     
-    # Aggregate data for the map
     map_data = filtered_df.groupby("Muncity").size().reset_index(name="Total Cases")
     
-    try:
-        # Load the GeoJSON file containing Abra municipality boundaries
-        # Ensure 'abra_municipalities.geojson' is uploaded to your GitHub repository
-        with open('abra_municipalities.geojson') as f:
-            abra_geojson = json.load(f)
-            
+    # Clean the Muncity names to match the geojson Standard_Name (uppercase and stripped)
+    map_data["Muncity"] = map_data["Muncity"].astype(str).str.strip().str.upper()
+    
+    abra_geojson = fetch_abra_geojson()
+    
+    if abra_geojson:
         fig_map = px.choropleth(
             map_data,
             geojson=abra_geojson,
             locations='Muncity',
-            featureidkey='properties.NAME_2', # Update this key based on your GeoJSON properties
+            featureidkey='properties.Standard_Name', 
             color='Total Cases',
             color_continuous_scale="Reds",
             title="Dengue Case Distribution across Abra",
@@ -196,10 +232,8 @@ with tab3:
         )
         fig_map.update_geos(fitbounds="locations", visible=False)
         st.plotly_chart(fig_map, use_container_width=True)
-        
-    except FileNotFoundError:
-        st.warning("Map cannot be rendered: 'abra_municipalities.geojson' file is missing from the directory.")
-        st.info("To enable this feature, obtain a valid GeoJSON file of Abra's municipalities and upload it to your project folder.")
+    else:
+        st.error("Could not fetch the Abra geographic boundaries from the provided URLs.")
         
 with tab4:
     st.subheader("Surveillance Line List")
