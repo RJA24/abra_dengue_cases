@@ -107,7 +107,7 @@ df = load_data()
 with st.sidebar:
     st.markdown("### Surveillance Filters")
     
-    with st.expander("Filter Options", expanded=True):
+    with st.expander("Filter Options", expanded=False):
         muncity_input = st.multiselect(
             "Select Municipality (Leave blank for all):", 
             options=sorted(df["Muncity"].dropna().unique()), 
