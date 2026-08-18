@@ -11,22 +11,20 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- Custom CSS for Clean Presentation ---
+# --- Custom CSS for Layout Polish (Colors are now handled by config.toml) ---
 st.markdown("""
     <style>
     .block-container {
-        padding-top: 1rem;
+        padding-top: 1.5rem;
         padding-bottom: 2rem;
     }
+    /* Hide Default Streamlit Elements */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: visible;}
+    header {visibility: hidden;}
     
     .js-plotly-plot {
         margin-bottom: 2rem;
-    }
-    h1, h2, h3 {
-        color: #1e293b;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -109,7 +107,6 @@ df = load_data()
 with st.sidebar:
     st.markdown("### Surveillance Filters")
     
-    # Placed back inside an expander, initialized as expanded=True
     with st.expander("Filter Options", expanded=True):
         muncity_input = st.multiselect(
             "Select Municipality (Leave blank for all):", 
@@ -185,75 +182,62 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "Raw Line List"
 ])
 
-plotly_template = "plotly_white"
-
 with tab1:
-    # Morbidity Week Trend
     cases_by_week = filtered_df.groupby("MorbidityWeek").size().reset_index(name="Case Count")
     fig_line = px.line(
         cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, 
         title="Dengue Epidemic Curve by Morbidity Week",
-        labels={"MorbidityWeek": "Morbidity Week", "Case Count": "Number of Cases"},
-        template=plotly_template
+        labels={"MorbidityWeek": "Morbidity Week", "Case Count": "Number of Cases"}
     )
     fig_line.update_traces(line_color='#2563eb', marker=dict(size=10))
     fig_line.update_layout(height=500)
     st.plotly_chart(fig_line, use_container_width=True)
 
-    # Monthly Distribution
     month_counts = filtered_df.groupby("MorbidityMonth").size().reset_index(name="Cases")
     fig_month = px.bar(
         month_counts, x="MorbidityMonth", y="Cases", text_auto=True,
         title="Dengue Cases by Morbidity Month",
-        labels={"MorbidityMonth": "Month Number", "Cases": "Total Cases"},
-        template=plotly_template
+        labels={"MorbidityMonth": "Month Number", "Cases": "Total Cases"}
     )
     fig_month.update_traces(marker_color='#1d4ed8')
     fig_month.update_layout(height=450)
     st.plotly_chart(fig_month, use_container_width=True)
 
 with tab2:
-    # Municipality Bar Chart
     muncity_counts = filtered_df["Muncity"].value_counts().reset_index()
     muncity_counts.columns = ["Municipality", "Count"]
     fig_bar = px.bar(
         muncity_counts, x="Municipality", y="Count", 
         title="Total Cases per Municipality", 
-        text_auto=True,
-        template=plotly_template
+        text_auto=True
     )
     fig_bar.update_traces(marker_color='#2563eb')
     fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, height=500)
     st.plotly_chart(fig_bar, use_container_width=True)
 
-    # Age & Sex Pyramid/Histogram
     fig_hist = px.histogram(
         filtered_df, x="AgeYears", nbins=25, 
         title="Age and Sex Distribution of Cases", 
         color="Sex",
         barmode="group",
         labels={"AgeYears": "Age (Years)", "count": "Number of Cases"},
-        color_discrete_sequence=["#2563eb", "#ec4899"],
-        template=plotly_template
+        color_discrete_sequence=["#2563eb", "#ec4899"]
     )
     fig_hist.update_layout(height=500)
     st.plotly_chart(fig_hist, use_container_width=True)
 
-    # Indigenous Peoples (IP) Distribution
     if 'ipgroup' in filtered_df.columns:
         ip_df = filtered_df['ipgroup'].fillna('Non-IP / Not Specified').value_counts().reset_index()
         ip_df.columns = ['Group', 'Count']
         fig_ip = px.bar(
             ip_df, x='Group', y='Count', text_auto=True,
-            title="Dengue Cases by Indigenous Peoples (IP) Group",
-            template=plotly_template
+            title="Dengue Cases by Indigenous Peoples (IP) Group"
         )
         fig_ip.update_traces(marker_color='#059669')
         fig_ip.update_layout(height=450)
         st.plotly_chart(fig_ip, use_container_width=True)
 
 with tab3:
-    # Clinical Classification
     class_counts = filtered_df["ClinClass"].value_counts().reset_index()
     class_counts.columns = ["Classification", "Count"]
     
@@ -266,32 +250,27 @@ with tab3:
     fig_pie = px.pie(
         class_counts, names="Classification", values="Count", hole=0.45, 
         title="Clinical Severity Classification",
-        color="Classification", color_discrete_map=color_map,
-        template=plotly_template
+        color="Classification", color_discrete_map=color_map
     )
     fig_pie.update_layout(height=500)
     st.plotly_chart(fig_pie, use_container_width=True)
 
-    # Health Facility Type (DRU)
     if 'DRU' in filtered_df.columns:
         dru_counts = filtered_df["DRU"].fillna("Unspecified").value_counts().reset_index()
         dru_counts.columns = ["Facility Type", "Count"]
         fig_dru = px.bar(
             dru_counts, x="Facility Type", y="Count", text_auto=True,
-            title="Cases by Disease Reporting Unit (DRU) Type",
-            template=plotly_template
+            title="Cases by Disease Reporting Unit (DRU) Type"
         )
         fig_dru.update_traces(marker_color='#6366f1')
         fig_dru.update_layout(height=450)
         st.plotly_chart(fig_dru, use_container_width=True)
 
-    # Diagnostic Test Type & Results
     if 'LabTest' in filtered_df.columns and 'LabRes' in filtered_df.columns:
         lab_counts = filtered_df.groupby(['LabTest', 'LabRes']).size().reset_index(name='Count')
         fig_lab = px.bar(
             lab_counts, x="LabTest", y="Count", color="LabRes", barmode="stack",
-            title="Diagnostic Modality and Laboratory Results",
-            template=plotly_template
+            title="Diagnostic Modality and Laboratory Results"
         )
         fig_lab.update_layout(height=500)
         st.plotly_chart(fig_lab, use_container_width=True)
@@ -299,17 +278,11 @@ with tab3:
 with tab4:
     st.subheader("Geographic Heatmap of Dengue Cases")
     
-    # Start with a baseline of all 27 Abra municipalities with 0 cases
     base_df = pd.DataFrame({"Muncity": ALL_ABRA_MUNICIPALITIES, "Base_Cases": 0})
-    
-    # Count current filtered cases
     curr_cases = filtered_df.groupby("Muncity").size().reset_index(name="Filtered_Cases")
     
-    # Merge baseline and actuals to ensure 0-case areas stay visible
     map_data = pd.merge(base_df, curr_cases, on="Muncity", how="left")
     map_data["Total Cases"] = map_data["Filtered_Cases"].fillna(0).astype(int)
-    
-    # Generate normalized join keys
     map_data["Join_Key"] = map_data["Muncity"].apply(normalize_name)
     
     abra_geojson = fetch_abra_geojson()
