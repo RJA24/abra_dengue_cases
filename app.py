@@ -265,7 +265,7 @@ with tab4:
         "Dark": "carto-darkmatter",
         "Satellite": "white-bg" 
     }
-    
+    label_color = 'white' if map_style_choice in ["Dark", "Satellite"] else 'black'
 
     if muncity_input != "All Municipalities":
         st.subheader(f"Geographic Heatmap: Barangays in {muncity_input}")
