@@ -87,7 +87,6 @@ def extract_brgy_name(props):
             if len(v_str) > 2: return v_str
     return "UNKNOWN"
 
-# Guaranteed to return pure Python floats, preventing Plotly silent serialization failures
 def get_polygon_centroid(geometry):
     try:
         coords = []
@@ -292,8 +291,8 @@ with tab4:
                 lon, lat = get_polygon_centroid(feat['geometry'])
                 if lon is not None and lat is not None:
                     lons.append(lon); lats.append(lat)
-                    # Using Python Newlines \n for map labels
-                    texts.append(f"{display_name.title()}\n{int(cases)}")
+                    # USING <br> FOR TWO ROWS
+                    texts.append(f"{display_name.title()}<br>{int(cases)}")
             
             cam_lat = np.mean(lats) if lats else 17.58
             cam_lon = np.mean(lons) if lons else 120.83
@@ -307,7 +306,6 @@ with tab4:
             if map_style_choice == "Satellite":
                 fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
             
-            # Note: Font size decreased to 12 to fit the extra text cleanly
             fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
             fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
             st.plotly_chart(fig_map, use_container_width=True)
@@ -331,8 +329,8 @@ with tab4:
                 lon, lat = get_polygon_centroid(feat['geometry'])
                 if lon is not None and lat is not None:
                     lons.append(lon); lats.append(lat)
-                    # Using Python Newlines \n for map labels
-                    texts.append(f"{std_name.title()}\n{int(cases)}")
+                    # USING <br> FOR TWO ROWS
+                    texts.append(f"{std_name.title()}<br>{int(cases)}")
                     
             fig_map = px.choropleth_mapbox(
                 map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
@@ -343,7 +341,6 @@ with tab4:
             if map_style_choice == "Satellite":
                 fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
 
-            # Note: Font size decreased to 12 to fit the extra text cleanly
             fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
             fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
             st.plotly_chart(fig_map, use_container_width=True)
