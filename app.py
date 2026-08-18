@@ -25,7 +25,6 @@ st.markdown("""
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     h1, h2, h3, h4, h5, h6, span, p, label { color: #1e293b !important; }
     .js-plotly-plot { margin-bottom: 2rem; }
-    /* Style the Map Theme radio buttons */
     div.row-widget.stRadio > div { flex-direction: row; align-items: center; justify-content: center; background: white; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
     </style>
 """, unsafe_allow_html=True)
@@ -66,15 +65,12 @@ def clean_brgy_name(raw_name):
     return re.sub(r'[^A-Z0-9]', '', raw)
 
 def get_muni_name_from_props(props):
-    """Safely extracts municipality name by checking official keys first to avoid cross-province mismatches."""
     keys = ['ADM3_EN', 'MUN_NAME', 'NAME_3', 'MUNICIPALITY']
     upper_props = {str(k).upper(): str(v) for k, v in props.items()}
-    
     for k in keys:
         if k in upper_props:
             std = clean_muni_name(upper_props[k])
             if std in ALL_ABRA_MUNICIPALITIES: return std
-            
     for val in props.values():
         std = clean_muni_name(str(val))
         if std in ALL_ABRA_MUNICIPALITIES: return std
@@ -91,16 +87,20 @@ def extract_brgy_name(props):
             if len(v_str) > 2: return v_str
     return "UNKNOWN"
 
+# Reverted to the original, stable centroid calculation logic
 def get_polygon_centroid(geometry):
-    try:
-        if geometry['type'] == 'Polygon':
-            coords = np.array(geometry['coordinates'][0])
-        elif geometry['type'] == 'MultiPolygon':
-            largest_poly = max(geometry['coordinates'], key=lambda p: len(p[0]))
-            coords = np.array(largest_poly[0])
-        else: return None, None
-        return np.mean(coords[:, 0]), np.mean(coords[:, 1])
-    except: return None, None
+    coords = []
+    if geometry['type'] == 'Polygon':
+        for ring in geometry['coordinates']:
+            coords.extend(ring)
+    elif geometry['type'] == 'MultiPolygon':
+        for poly in geometry['coordinates']:
+            for ring in poly:
+                coords.extend(ring)
+    if not coords:
+        return None, None
+    coords = np.array(coords)
+    return np.mean(coords[:, 0]), np.mean(coords[:, 1])
 
 # --- Data Loading ---
 @st.cache_data(ttl=600)
@@ -128,7 +128,6 @@ def fetch_muncity_geojson():
                 features = []
                 for f in data.get('features', []):
                     props = f.get('properties', {})
-                    # STRICT PROVINCE CHECK to fix the La Paz bug
                     if any('ABRA' in str(v).upper() for v in props.values()):
                         muni = get_muni_name_from_props(props)
                         if muni:
@@ -162,8 +161,6 @@ df = load_data()
 with st.sidebar:
     st.markdown("### Surveillance Filters")
     with st.expander("Filter Options", expanded=True):
-        
-        # Single Select for Municipality
         muni_options = ["All Municipalities"] + sorted(df["Muncity"].dropna().unique().tolist())
         muncity_input = st.selectbox("Select Municipality:", options=muni_options, index=0)
         
@@ -262,9 +259,10 @@ with tab4:
         "Light": "carto-positron",
         "Street": "open-street-map",
         "Dark": "carto-darkmatter",
-        "Satellite": "white-bg" # Custom layer triggered below
+        "Satellite": "white-bg" 
     }
     
+    # Ensuring labels always pop visually
     label_color = 'white' if map_style_choice in ["Dark", "Satellite"] else 'black'
 
     if muncity_input != "All Municipalities":
@@ -289,7 +287,7 @@ with tab4:
                 match = map_data[map_data['Join_Key'] == std_name]
                 cases = match['Total Cases'].values[0] if not match.empty else 0
                 lon, lat = get_polygon_centroid(feat['geometry'])
-                if lon and lat:
+                if lon is not None and lat is not None:
                     lons.append(lon); lats.append(lat); texts.append(str(int(cases)))
             
             cam_lat = np.mean(lats) if lats else 17.58
@@ -304,7 +302,7 @@ with tab4:
             if map_style_choice == "Satellite":
                 fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
             
-            fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textposition='middle center', textfont=dict(size=14, color=label_color, family="Arial Black"), hoverinfo='skip', showlegend=False))
+            fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=14, color=label_color, family="Arial Black"), hoverinfo='skip', showlegend=False))
             fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
             st.plotly_chart(fig_map, use_container_width=True)
         else:
@@ -325,7 +323,7 @@ with tab4:
                 match = map_data[map_data['Muncity'] == std_name]
                 cases = match['Total Cases'].values[0] if not match.empty else 0
                 lon, lat = get_polygon_centroid(feat['geometry'])
-                if lon and lat:
+                if lon is not None and lat is not None:
                     lons.append(lon); lats.append(lat); texts.append(str(int(cases)))
                     
             fig_map = px.choropleth_mapbox(
@@ -337,7 +335,7 @@ with tab4:
             if map_style_choice == "Satellite":
                 fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
 
-            fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textposition='middle center', textfont=dict(size=14, color=label_color, family="Arial Black"), hoverinfo='skip', showlegend=False))
+            fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=14, color=label_color, family="Arial Black"), hoverinfo='skip', showlegend=False))
             fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
             st.plotly_chart(fig_map, use_container_width=True)
         else:
