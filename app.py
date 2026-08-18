@@ -87,20 +87,24 @@ def extract_brgy_name(props):
             if len(v_str) > 2: return v_str
     return "UNKNOWN"
 
-# Reverted to the original, stable centroid calculation logic
+# Guaranteed to return pure Python floats, preventing Plotly silent serialization failures
 def get_polygon_centroid(geometry):
-    coords = []
-    if geometry['type'] == 'Polygon':
-        for ring in geometry['coordinates']:
-            coords.extend(ring)
-    elif geometry['type'] == 'MultiPolygon':
-        for poly in geometry['coordinates']:
-            for ring in poly:
+    try:
+        coords = []
+        if geometry['type'] == 'Polygon':
+            for ring in geometry['coordinates']:
                 coords.extend(ring)
-    if not coords:
+        elif geometry['type'] == 'MultiPolygon':
+            for poly in geometry['coordinates']:
+                for ring in poly:
+                    coords.extend(ring)
+        if not coords:
+            return None, None
+        
+        coords = np.array(coords)
+        return float(np.mean(coords[:, 0])), float(np.mean(coords[:, 1]))
+    except:
         return None, None
-    coords = np.array(coords)
-    return np.mean(coords[:, 0]), np.mean(coords[:, 1])
 
 # --- Data Loading ---
 @st.cache_data(ttl=600)
@@ -261,8 +265,6 @@ with tab4:
         "Dark": "carto-darkmatter",
         "Satellite": "white-bg" 
     }
-    
-    # Ensuring labels always pop visually
     label_color = 'white' if map_style_choice in ["Dark", "Satellite"] else 'black'
 
     if muncity_input != "All Municipalities":
@@ -302,7 +304,8 @@ with tab4:
             if map_style_choice == "Satellite":
                 fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
             
-            fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=14, color=label_color, family="Arial Black"), hoverinfo='skip', showlegend=False))
+            # Reverted to base mode='text' and strict python floats
+            fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=14, color=label_color), hoverinfo='skip', showlegend=False))
             fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
             st.plotly_chart(fig_map, use_container_width=True)
         else:
@@ -335,7 +338,8 @@ with tab4:
             if map_style_choice == "Satellite":
                 fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
 
-            fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=14, color=label_color, family="Arial Black"), hoverinfo='skip', showlegend=False))
+            # Reverted to base mode='text' and strict python floats
+            fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=14, color=label_color), hoverinfo='skip', showlegend=False))
             fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
             st.plotly_chart(fig_map, use_container_width=True)
         else:
