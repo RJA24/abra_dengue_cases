@@ -36,9 +36,8 @@ ALL_ABRA_MUNICIPALITIES = [
     "TUBO", "VILLAVICIOSA"
 ]
 
-# --- Bulletproof Name Matching Algorithm ---
+# --- Aggressive Name Matching Algorithms ---
 def get_standard_muni_name(raw_name):
-    """Forces names to match exactly by checking keywords and stripping junk."""
     if not isinstance(raw_name, str): return ""
     raw = raw_name.upper()
     raw = unicodedata.normalize('NFKD', raw).encode('ASCII', 'ignore').decode('utf-8')
@@ -53,21 +52,41 @@ def get_standard_muni_name(raw_name):
     
     for muni in ALL_ABRA_MUNICIPALITIES:
         clean_muni = muni.replace("Ñ", "N").replace("-", "")
-        if clean_muni in raw:
-            return muni
+        if clean_muni in raw: return muni
     return raw_name
+
+def scan_props_for_muni(props):
+    """Scans all property values in a GeoJSON feature to find an Abra municipality match."""
+    for val in props.values():
+        standardized = get_standard_muni_name(str(val))
+        if standardized in ALL_ABRA_MUNICIPALITIES:
+            return standardized
+    return None
+
+def extract_brgy_name(props):
+    """Searches common barangay column names to extract the barangay string."""
+    keys_to_check = ['ADM4_EN', 'BGY_NAME', 'BRGY_NAME', 'BARANGAY', 'NAME_4', 'NAME_3']
+    props_upper_keys = {str(k).upper(): v for k, v in props.items()}
+    
+    for key in keys_to_check:
+        if key in props_upper_keys:
+            return str(props_upper_keys[key]).upper().strip()
+            
+    # Fallback: Just return the longest string that isn't the province or municipality
+    for val in props.values():
+        val_str = str(val).upper().strip()
+        if val_str not in ["ABRA", "PHILIPPINES"] and get_standard_muni_name(val_str) not in ALL_ABRA_MUNICIPALITIES:
+            if len(val_str) > 2: return val_str
+    return "UNKNOWN"
 
 def get_polygon_centroid(geometry):
     coords = []
     if geometry['type'] == 'Polygon':
-        for ring in geometry['coordinates']:
-            coords.extend(ring)
+        for ring in geometry['coordinates']: coords.extend(ring)
     elif geometry['type'] == 'MultiPolygon':
         for poly in geometry['coordinates']:
-            for ring in poly:
-                coords.extend(ring)
-    if not coords:
-        return None, None
+            for ring in poly: coords.extend(ring)
+    if not coords: return None, None
     coords = np.array(coords)
     return np.mean(coords[:, 0]), np.mean(coords[:, 1])
 
@@ -77,15 +96,11 @@ def load_data():
     sheet_id = "1IHdlNfzNtBAOk3LlDN2LstxlRmoGQNTRgF7vZ2P_t4U"
     csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
     df = pd.read_csv(csv_url)
+    if 'DOnset' in df.columns: df['DOnset'] = pd.to_datetime(df['DOnset'], errors='coerce')
     
-    if 'DOnset' in df.columns:
-        df['DOnset'] = pd.to_datetime(df['DOnset'], errors='coerce')
-    
-    # FORCE CLEAN MUNICIPALITY NAMES AT LOAD TIME
     if 'Muncity' in df.columns:
         df['Muncity'] = df['Muncity'].astype(str).str.upper().str.strip()
         df['Muncity'] = df['Muncity'].apply(get_standard_muni_name)
-        
     return df
 
 @st.cache_data(ttl="24h")
@@ -103,9 +118,10 @@ def fetch_muncity_geojson():
                 abra_features = []
                 for feature in data.get('features', []):
                     props = feature.get('properties', {})
-                    if any('ABRA' in str(v).upper() for v in props.values()):
-                        muni_name = props.get('ADM3_EN', props.get('NAME_3', props.get('MUN_NAME', '')))
-                        feature['properties']['Standard_Name'] = get_standard_muni_name(muni_name)
+                    # Aggressive scan: Is this shape in Abra?
+                    muni_match = scan_props_for_muni(props)
+                    if muni_match:
+                        feature['properties']['Standard_Name'] = muni_match
                         abra_features.append(feature)
                 if abra_features:
                     return {"type": "FeatureCollection", "features": abra_features}
@@ -113,11 +129,9 @@ def fetch_muncity_geojson():
             continue 
     return None
 
-# Removed cache decorator here so it reads live and escapes the "Ghost Error"
 def fetch_barangay_geojson(target_municipality):
     if not os.path.exists("abra_barangays.geojson"):
         return None, "File 'abra_barangays.geojson' not found in the repository."
-    
     try:
         with open("abra_barangays.geojson", "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -126,20 +140,19 @@ def fetch_barangay_geojson(target_municipality):
             
             for feature in data.get('features', []):
                 props = feature.get('properties', {})
-                # Normalize keys just in case mapshaper changed casing
-                props_upper = {str(k).upper(): str(v).upper() for k, v in props.items()}
                 
-                muni_name = props_upper.get('ADM3_EN', props_upper.get('MUN_NAME', props_upper.get('NAME_3', '')))
-                brgy_name = props_upper.get('ADM4_EN', props_upper.get('BGY_NAME', props_upper.get('NAME_4', props_upper.get('BARANGAY', ''))))
-                
-                if get_standard_muni_name(muni_name) == target:
-                    feature['properties']['Standard_Name'] = str(brgy_name).upper().strip()
+                # Check if this shape belongs to our target municipality
+                if scan_props_for_muni(props) == target:
+                    feature['properties']['Standard_Name'] = extract_brgy_name(props)
                     features.append(feature)
                     
             if not features:
-                return None, f"Found the file, but no barangays matched the municipality: {target}"
+                # DEBUG SAFETY NET: If it fails, pull the first item's properties so the user can see what's wrong.
+                sample_props = data.get('features', [{}])[0].get('properties', {})
+                debug_msg = f"No barangays matched '{target}'.\n\n**Debug Info - Here are the exact properties inside your GeoJSON file:**\n```json\n{json.dumps(sample_props, indent=2)}\n```"
+                return None, debug_msg
+                
             return {"type": "FeatureCollection", "features": features}, None
-            
     except Exception as e:
         return None, f"Error reading file: {str(e)}"
 
@@ -265,7 +278,7 @@ with tab4:
             fig_map.update_layout(margin={"r":0,"t":40,"l":0,"b":0}, height=700)
             st.plotly_chart(fig_map, use_container_width=True)
         else:
-            st.error(f"Cannot display map. Reason: {err_msg}")
+            st.error(err_msg)
             
     else:
         st.subheader("Geographic Heatmap: Municipalities in Abra")
