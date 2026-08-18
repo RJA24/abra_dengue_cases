@@ -22,7 +22,7 @@ st.markdown("""
     .stApp { background-color: #f8fafc !important; color: #0f172a !important; }
     section[data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #e2e8f0; }
     .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: visible;}
+    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     h1, h2, h3, h4, h5, h6, span, p, label { color: #1e293b !important; }
     .js-plotly-plot { margin-bottom: 2rem; }
     div.row-widget.stRadio > div { flex-direction: row; align-items: center; justify-content: center; background: white; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
@@ -286,11 +286,14 @@ with tab4:
             lons, lats, texts = [], [], []
             for feat in brgy_geojson['features']:
                 std_name = feat['properties']['Standard_Name']
+                display_name = feat['properties'].get('Original_Name', std_name)
                 match = map_data[map_data['Join_Key'] == std_name]
                 cases = match['Total Cases'].values[0] if not match.empty else 0
                 lon, lat = get_polygon_centroid(feat['geometry'])
                 if lon is not None and lat is not None:
-                    lons.append(lon); lats.append(lat); texts.append(str(int(cases)))
+                    lons.append(lon); lats.append(lat)
+                    # Using Python Newlines \n for map labels
+                    texts.append(f"{display_name.title()}\n{int(cases)}")
             
             cam_lat = np.mean(lats) if lats else 17.58
             cam_lon = np.mean(lons) if lons else 120.83
@@ -304,8 +307,8 @@ with tab4:
             if map_style_choice == "Satellite":
                 fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
             
-            # Reverted to base mode='text' and strict python floats
-            fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=14, color=label_color), hoverinfo='skip', showlegend=False))
+            # Note: Font size decreased to 12 to fit the extra text cleanly
+            fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
             fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
             st.plotly_chart(fig_map, use_container_width=True)
         else:
@@ -327,7 +330,9 @@ with tab4:
                 cases = match['Total Cases'].values[0] if not match.empty else 0
                 lon, lat = get_polygon_centroid(feat['geometry'])
                 if lon is not None and lat is not None:
-                    lons.append(lon); lats.append(lat); texts.append(str(int(cases)))
+                    lons.append(lon); lats.append(lat)
+                    # Using Python Newlines \n for map labels
+                    texts.append(f"{std_name.title()}\n{int(cases)}")
                     
             fig_map = px.choropleth_mapbox(
                 map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
@@ -338,8 +343,8 @@ with tab4:
             if map_style_choice == "Satellite":
                 fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
 
-            # Reverted to base mode='text' and strict python floats
-            fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=14, color=label_color), hoverinfo='skip', showlegend=False))
+            # Note: Font size decreased to 12 to fit the extra text cleanly
+            fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
             fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
             st.plotly_chart(fig_map, use_container_width=True)
         else:
