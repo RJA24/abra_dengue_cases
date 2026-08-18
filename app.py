@@ -25,6 +25,8 @@ st.markdown("""
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     h1, h2, h3, h4, h5, h6, span, p, label { color: #1e293b !important; }
     .js-plotly-plot { margin-bottom: 2rem; }
+    /* Style the Map Theme radio buttons */
+    div.row-widget.stRadio > div { flex-direction: row; align-items: center; justify-content: center; background: white; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -56,20 +58,26 @@ def clean_muni_name(raw_name):
     return raw_name
 
 def clean_brgy_name(raw_name):
-    """Aggressively cleans barangay names to ensure matching."""
     if not isinstance(raw_name, str): return ""
     raw = str(raw_name).upper()
     raw = unicodedata.normalize('NFKD', raw).encode('ASCII', 'ignore').decode('utf-8')
-    # Strip common variations and words in parentheses (e.g. "Zone 5 Pob. (Nalasin)" -> "ZONE5")
     raw = re.sub(r'\(.*?\)', '', raw) 
     raw = raw.replace("BARANGAY", "").replace("BRGY", "").replace("POBLACION", "POB").replace("POB.", "POB")
     return re.sub(r'[^A-Z0-9]', '', raw)
 
-def scan_props_for_muni(props):
+def get_muni_name_from_props(props):
+    """Safely extracts municipality name by checking official keys first to avoid cross-province mismatches."""
+    keys = ['ADM3_EN', 'MUN_NAME', 'NAME_3', 'MUNICIPALITY']
+    upper_props = {str(k).upper(): str(v) for k, v in props.items()}
+    
+    for k in keys:
+        if k in upper_props:
+            std = clean_muni_name(upper_props[k])
+            if std in ALL_ABRA_MUNICIPALITIES: return std
+            
     for val in props.values():
-        standardized = clean_muni_name(str(val))
-        if standardized in ALL_ABRA_MUNICIPALITIES:
-            return standardized
+        std = clean_muni_name(str(val))
+        if std in ALL_ABRA_MUNICIPALITIES: return std
     return None
 
 def extract_brgy_name(props):
@@ -90,11 +98,9 @@ def get_polygon_centroid(geometry):
         elif geometry['type'] == 'MultiPolygon':
             largest_poly = max(geometry['coordinates'], key=lambda p: len(p[0]))
             coords = np.array(largest_poly[0])
-        else:
-            return None, None
+        else: return None, None
         return np.mean(coords[:, 0]), np.mean(coords[:, 1])
-    except:
-        return None, None
+    except: return None, None
 
 # --- Data Loading ---
 @st.cache_data(ttl=600)
@@ -104,8 +110,7 @@ def load_data():
     df = pd.read_csv(csv_url)
     
     if 'DOnset' in df.columns: df['DOnset'] = pd.to_datetime(df['DOnset'], errors='coerce')
-    if 'Muncity' in df.columns:
-        df['Muncity'] = df['Muncity'].apply(clean_muni_name)
+    if 'Muncity' in df.columns: df['Muncity'] = df['Muncity'].apply(clean_muni_name)
     return df
 
 @st.cache_data(ttl="24h")
@@ -122,10 +127,13 @@ def fetch_muncity_geojson():
                 data = resp.json()
                 features = []
                 for f in data.get('features', []):
-                    muni = scan_props_for_muni(f.get('properties', {}))
-                    if muni:
-                        f['properties']['Standard_Name'] = muni
-                        features.append(f)
+                    props = f.get('properties', {})
+                    # STRICT PROVINCE CHECK to fix the La Paz bug
+                    if any('ABRA' in str(v).upper() for v in props.values()):
+                        muni = get_muni_name_from_props(props)
+                        if muni:
+                            f['properties']['Standard_Name'] = muni
+                            features.append(f)
                 if features: return {"type": "FeatureCollection", "features": features}
         except: continue
     return None
@@ -139,16 +147,14 @@ def fetch_barangay_geojson(target_muni):
             features = []
             target = clean_muni_name(target_muni)
             for feat in data.get('features', []):
-                if scan_props_for_muni(feat.get('properties', {})) == target:
+                if get_muni_name_from_props(feat.get('properties', {})) == target:
                     raw_brgy = extract_brgy_name(feat.get('properties', {}))
-                    # Storing original name for hover and clean name for joining
                     feat['properties']['Original_Name'] = raw_brgy
                     feat['properties']['Standard_Name'] = clean_brgy_name(raw_brgy)
                     features.append(feat)
             if features: return {"type": "FeatureCollection", "features": features}, None
             return None, f"No barangays matched inside {target_muni}."
-    except Exception as e:
-        return None, str(e)
+    except Exception as e: return None, str(e)
 
 df = load_data()
 
@@ -156,7 +162,11 @@ df = load_data()
 with st.sidebar:
     st.markdown("### Surveillance Filters")
     with st.expander("Filter Options", expanded=True):
-        muncity_input = st.multiselect("Select Municipality:", options=sorted(df["Muncity"].dropna().unique()), default=[])
+        
+        # Single Select for Municipality
+        muni_options = ["All Municipalities"] + sorted(df["Muncity"].dropna().unique().tolist())
+        muncity_input = st.selectbox("Select Municipality:", options=muni_options, index=0)
+        
         sex_input = st.multiselect("Select Sex:", options=df["Sex"].dropna().unique(), default=[])
         clin_input = st.multiselect("Clinical Classification:", options=df["ClinClass"].dropna().unique(), default=[])
         
@@ -165,12 +175,14 @@ with st.sidebar:
         st.cache_data.clear()
         st.rerun()
 
-muncity_filter = muncity_input if muncity_input else df["Muncity"].dropna().unique()
+muncity_filter = df["Muncity"].dropna().unique() if muncity_input == "All Municipalities" else [muncity_input]
 sex_filter = sex_input if sex_input else df["Sex"].dropna().unique()
 clin_filter = clin_input if clin_input else df["ClinClass"].dropna().unique()
 filtered_df = df.query("Muncity in @muncity_filter & Sex in @sex_filter & ClinClass in @clin_filter")
 
+# --- Header & KPIs ---
 st.title("Abra PESU: Dengue Surveillance Dashboard")
+st.markdown("**Provincial Epidemiology and Surveillance Unit - Official Data Portal**")
 st.markdown("---")
 
 total_cases = len(filtered_df)
@@ -231,7 +243,6 @@ with tab3:
         class_counts = filtered_df["ClinClass"].value_counts().reset_index()
         class_counts.columns = ["Classification", "Count"]
         color_map = {"NO WARNING SIGNS": "#10b981", "WITH WARNING SIGNS": "#f59e0b", "SEVERE DENGUE": "#ef4444"}
-        
         fig_pie = px.pie(class_counts, names="Classification", values="Count", hole=0.45, title="Clinical Severity Classification", color="Classification", color_discrete_map=color_map)
         fig_pie.update_layout(height=500)
         st.plotly_chart(fig_pie, use_container_width=True)
@@ -245,34 +256,33 @@ with tab3:
         st.plotly_chart(fig_dru, use_container_width=True)
 
 with tab4:
-    if len(muncity_input) == 1:
-        target_muni = muncity_input[0]
-        st.subheader(f"Geographic Heatmap: Barangays in {target_muni}")
-        brgy_geojson, err = fetch_barangay_geojson(target_muni)
+    map_style_choice = st.radio("Select Map Theme:", ["Light", "Street", "Satellite", "Dark"], horizontal=True)
+    
+    style_map = {
+        "Light": "carto-positron",
+        "Street": "open-street-map",
+        "Dark": "carto-darkmatter",
+        "Satellite": "white-bg" # Custom layer triggered below
+    }
+    
+    label_color = 'white' if map_style_choice in ["Dark", "Satellite"] else 'black'
+
+    if muncity_input != "All Municipalities":
+        st.subheader(f"Geographic Heatmap: Barangays in {muncity_input}")
+        brgy_geojson, err = fetch_barangay_geojson(muncity_input)
         
         if brgy_geojson and "Barangay" in filtered_df.columns:
-            # 1. Create a Baseline of ALL Barangays in the GeoJSON to force them to draw
             all_geojson_brgys = [f['properties']['Standard_Name'] for f in brgy_geojson['features']]
             all_geojson_originals = [f['properties']['Original_Name'] for f in brgy_geojson['features']]
             
-            base_df = pd.DataFrame({
-                "Join_Key": all_geojson_brgys,
-                "Barangay_Display": all_geojson_originals,
-                "Base_Cases": 0
-            })
-            
-            # 2. Count actual cases from dataset
+            base_df = pd.DataFrame({"Join_Key": all_geojson_brgys, "Barangay_Display": all_geojson_originals, "Base_Cases": 0})
             curr_cases = filtered_df.groupby("Barangay").size().reset_index(name="Filtered_Cases")
             curr_cases["Join_Key"] = curr_cases["Barangay"].apply(clean_brgy_name)
-            
-            # Combine duplicates if clean_brgy_name collapsed multiple spelling variations into one
             curr_cases = curr_cases.groupby("Join_Key")["Filtered_Cases"].sum().reset_index()
             
-            # 3. Merge Baseline with Actuals
             map_data = pd.merge(base_df, curr_cases, on="Join_Key", how="left")
             map_data["Total Cases"] = map_data["Filtered_Cases"].fillna(0).astype(int)
             
-            # Gather coordinates
             lons, lats, texts = [], [], []
             for feat in brgy_geojson['features']:
                 std_name = feat['properties']['Standard_Name']
@@ -282,24 +292,23 @@ with tab4:
                 if lon and lat:
                     lons.append(lon); lats.append(lat); texts.append(str(int(cases)))
             
-            # Center camera
             cam_lat = np.mean(lats) if lats else 17.58
             cam_lon = np.mean(lons) if lons else 120.83
             
             fig_map = px.choropleth_mapbox(
                 map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
                 color='Total Cases', hover_name='Barangay_Display', color_continuous_scale="Reds",
-                mapbox_style="carto-positron", zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.85
+                mapbox_style=style_map[map_style_choice], zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.85
             )
             
-            fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textposition='middle center', textfont=dict(size=14, color='black'), hoverinfo='skip', showlegend=False))
-            fig_map.update_layout(margin={"r":0,"t":40,"l":0,"b":0}, height=700)
+            if map_style_choice == "Satellite":
+                fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
+            
+            fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textposition='middle center', textfont=dict(size=14, color=label_color, family="Arial Black"), hoverinfo='skip', showlegend=False))
+            fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
             st.plotly_chart(fig_map, use_container_width=True)
         else:
-            if err:
-                st.error(err)
-            else:
-                st.error("Barangay column not found in data.")
+            st.error(err if err else "Barangay column missing in data.")
             
     else:
         st.subheader("Geographic Heatmap: Municipalities in Abra")
@@ -322,10 +331,14 @@ with tab4:
             fig_map = px.choropleth_mapbox(
                 map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
                 color='Total Cases', hover_name='Muncity', color_continuous_scale="Reds",
-                mapbox_style="carto-positron", zoom=8.8, center={"lat": 17.58, "lon": 120.83}, opacity=0.85
+                mapbox_style=style_map[map_style_choice], zoom=8.8, center={"lat": 17.58, "lon": 120.83}, opacity=0.85
             )
-            fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textposition='middle center', textfont=dict(size=14, color='black'), hoverinfo='skip', showlegend=False))
-            fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, height=700)
+            
+            if map_style_choice == "Satellite":
+                fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
+
+            fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textposition='middle center', textfont=dict(size=14, color=label_color, family="Arial Black"), hoverinfo='skip', showlegend=False))
+            fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
             st.plotly_chart(fig_map, use_container_width=True)
         else:
             st.error("Could not fetch the Abra geographic boundaries.")
