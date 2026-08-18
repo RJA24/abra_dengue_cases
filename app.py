@@ -36,7 +36,7 @@ ALL_ABRA_MUNICIPALITIES = [
     "TUBO", "VILLAVICIOSA"
 ]
 
-# --- Core Matching Algorithms (Strips spaces, punctuation, etc.) ---
+# --- Core Matching Algorithms ---
 def clean_muni_name(raw_name):
     if not isinstance(raw_name, str): return ""
     raw = str(raw_name).upper()
@@ -60,7 +60,9 @@ def clean_brgy_name(raw_name):
     if not isinstance(raw_name, str): return ""
     raw = str(raw_name).upper()
     raw = unicodedata.normalize('NFKD', raw).encode('ASCII', 'ignore').decode('utf-8')
-    raw = raw.replace("BARANGAY", "").replace("BRGY", "")
+    # Strip common variations and words in parentheses (e.g. "Zone 5 Pob. (Nalasin)" -> "ZONE5")
+    raw = re.sub(r'\(.*?\)', '', raw) 
+    raw = raw.replace("BARANGAY", "").replace("BRGY", "").replace("POBLACION", "POB").replace("POB.", "POB")
     return re.sub(r'[^A-Z0-9]', '', raw)
 
 def scan_props_for_muni(props):
@@ -75,7 +77,6 @@ def extract_brgy_name(props):
     upper_props = {str(k).upper(): v for k, v in props.items()}
     for k in keys:
         if k in upper_props: return str(upper_props[k])
-    # Fallback to finding the longest unique string
     for val in props.values():
         v_str = str(val).upper().strip()
         if v_str not in ["ABRA", "PHILIPPINES"] and clean_muni_name(v_str) not in ALL_ABRA_MUNICIPALITIES:
@@ -87,7 +88,6 @@ def get_polygon_centroid(geometry):
         if geometry['type'] == 'Polygon':
             coords = np.array(geometry['coordinates'][0])
         elif geometry['type'] == 'MultiPolygon':
-            # Grab the largest polygon fragment to place the label safely
             largest_poly = max(geometry['coordinates'], key=lambda p: len(p[0]))
             coords = np.array(largest_poly[0])
         else:
@@ -141,6 +141,8 @@ def fetch_barangay_geojson(target_muni):
             for feat in data.get('features', []):
                 if scan_props_for_muni(feat.get('properties', {})) == target:
                     raw_brgy = extract_brgy_name(feat.get('properties', {}))
+                    # Storing original name for hover and clean name for joining
+                    feat['properties']['Original_Name'] = raw_brgy
                     feat['properties']['Standard_Name'] = clean_brgy_name(raw_brgy)
                     features.append(feat)
             if features: return {"type": "FeatureCollection", "features": features}, None
@@ -249,10 +251,28 @@ with tab4:
         brgy_geojson, err = fetch_barangay_geojson(target_muni)
         
         if brgy_geojson and "Barangay" in filtered_df.columns:
-            map_data = filtered_df.groupby("Barangay").size().reset_index(name="Total Cases")
-            map_data["Join_Key"] = map_data["Barangay"].apply(clean_brgy_name)
+            # 1. Create a Baseline of ALL Barangays in the GeoJSON to force them to draw
+            all_geojson_brgys = [f['properties']['Standard_Name'] for f in brgy_geojson['features']]
+            all_geojson_originals = [f['properties']['Original_Name'] for f in brgy_geojson['features']]
             
-            # Gather coordinates to fix the Atlantic Ocean Camera Bug
+            base_df = pd.DataFrame({
+                "Join_Key": all_geojson_brgys,
+                "Barangay_Display": all_geojson_originals,
+                "Base_Cases": 0
+            })
+            
+            # 2. Count actual cases from dataset
+            curr_cases = filtered_df.groupby("Barangay").size().reset_index(name="Filtered_Cases")
+            curr_cases["Join_Key"] = curr_cases["Barangay"].apply(clean_brgy_name)
+            
+            # Combine duplicates if clean_brgy_name collapsed multiple spelling variations into one
+            curr_cases = curr_cases.groupby("Join_Key")["Filtered_Cases"].sum().reset_index()
+            
+            # 3. Merge Baseline with Actuals
+            map_data = pd.merge(base_df, curr_cases, on="Join_Key", how="left")
+            map_data["Total Cases"] = map_data["Filtered_Cases"].fillna(0).astype(int)
+            
+            # Gather coordinates
             lons, lats, texts = [], [], []
             for feat in brgy_geojson['features']:
                 std_name = feat['properties']['Standard_Name']
@@ -262,17 +282,16 @@ with tab4:
                 if lon and lat:
                     lons.append(lon); lats.append(lat); texts.append(str(int(cases)))
             
-            # Dynamically set camera center
+            # Center camera
             cam_lat = np.mean(lats) if lats else 17.58
             cam_lon = np.mean(lons) if lons else 120.83
             
             fig_map = px.choropleth_mapbox(
                 map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
-                color='Total Cases', hover_name='Barangay', color_continuous_scale="Reds",
+                color='Total Cases', hover_name='Barangay_Display', color_continuous_scale="Reds",
                 mapbox_style="carto-positron", zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.85
             )
             
-            # Map Labels properly configured to sit on top of map
             fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textposition='middle center', textfont=dict(size=14, color='black'), hoverinfo='skip', showlegend=False))
             fig_map.update_layout(margin={"r":0,"t":40,"l":0,"b":0}, height=700)
             st.plotly_chart(fig_map, use_container_width=True)
@@ -313,4 +332,6 @@ with tab4:
 
 with tab5:
     st.subheader("Surveillance Line List")
-    st.dataframe(filtered_df, use_container_width=True, hide_index=True, height=600)
+    display_cols = ["PatientNumber", "FullName", "Muncity", "AgeYears", "Sex", "DOnset", "DAdmit", "DRU", "ClinClass", "Outcome"]
+    available_cols = [col for col in display_cols if col in filtered_df.columns]
+    st.dataframe(filtered_df[available_cols].sort_values("DOnset", ascending=False), use_container_width=True, hide_index=True, height=600)
