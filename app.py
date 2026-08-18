@@ -43,7 +43,6 @@ def normalize_name(name):
     if not isinstance(name, str):
         return ""
     name = str(name).upper()
-    # Normalize unicode to separate characters from their accents, then drop the accents
     name = unicodedata.normalize('NFKD', name).encode('ASCII', 'ignore').decode('utf-8')
     name = re.sub(r'\(.*?\)', '', name)
     return re.sub(r'[^A-Z]', '', name)
@@ -61,7 +60,7 @@ def get_polygon_centroid(geometry):
     if not coords:
         return None, None
     coords = np.array(coords)
-    return np.mean(coords[:, 0]), np.mean(coords[:, 1]) # lon, lat
+    return np.mean(coords[:, 0]), np.mean(coords[:, 1])
 
 # --- Data & GeoJSON Loading ---
 @st.cache_data(ttl=600)
@@ -71,6 +70,8 @@ def load_data():
     df = pd.read_csv(csv_url)
     if 'DOnset' in df.columns:
         df['DOnset'] = pd.to_datetime(df['DOnset'], errors='coerce')
+    if 'DAdmit' in df.columns:
+        df['DAdmit'] = pd.to_datetime(df['DAdmit'], errors='coerce')
     return df
 
 @st.cache_data(ttl="24h")
@@ -111,7 +112,6 @@ def fetch_barangay_geojson(municipality):
                 props = feature.get('properties', {})
                 props_upper = {str(k).upper(): str(v).upper() for k, v in props.items()}
                 
-                # Check if this barangay belongs to the target municipality
                 if target_muni in normalize_name(str(props_upper.values())):
                     brgy_name = props_upper.get('BGY_NAME', props_upper.get('NAME_4', props_upper.get('BARANGAY', '')))
                     feature['properties']['Standard_Name'] = normalize_name(brgy_name)
@@ -173,10 +173,88 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "Epidemiological Trends", "Demographics & Geography", "Clinical & Laboratory", "Choropleth Map", "Raw Line List"
 ])
 
-# (Tabs 1, 2, 3, 5 remain the same as previous iterations; omitting here for brevity, keep your existing code for those tabs)
+with tab1:
+    cases_by_week = filtered_df.groupby("MorbidityWeek").size().reset_index(name="Case Count")
+    fig_line = px.line(
+        cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, 
+        title="Dengue Epidemic Curve by Morbidity Week",
+        labels={"MorbidityWeek": "Morbidity Week", "Case Count": "Number of Cases"}
+    )
+    fig_line.update_traces(line_color='#2563eb', marker=dict(size=10))
+    fig_line.update_layout(height=500)
+    st.plotly_chart(fig_line, use_container_width=True)
+
+    month_counts = filtered_df.groupby("MorbidityMonth").size().reset_index(name="Cases")
+    fig_month = px.bar(
+        month_counts, x="MorbidityMonth", y="Cases", text_auto=True,
+        title="Dengue Cases by Morbidity Month",
+        labels={"MorbidityMonth": "Month Number", "Cases": "Total Cases"}
+    )
+    fig_month.update_traces(marker_color='#1d4ed8')
+    fig_month.update_layout(height=450)
+    st.plotly_chart(fig_month, use_container_width=True)
+
+with tab2:
+    muncity_counts = filtered_df["Muncity"].value_counts().reset_index()
+    muncity_counts.columns = ["Municipality", "Count"]
+    fig_bar = px.bar(
+        muncity_counts, x="Municipality", y="Count", 
+        title="Total Cases per Municipality", text_auto=True
+    )
+    fig_bar.update_traces(marker_color='#2563eb')
+    fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, height=500)
+    st.plotly_chart(fig_bar, use_container_width=True)
+
+    fig_hist = px.histogram(
+        filtered_df, x="AgeYears", nbins=25, 
+        title="Age and Sex Distribution of Cases", color="Sex", barmode="group",
+        labels={"AgeYears": "Age (Years)", "count": "Number of Cases"},
+        color_discrete_sequence=["#2563eb", "#ec4899"]
+    )
+    fig_hist.update_layout(height=500)
+    st.plotly_chart(fig_hist, use_container_width=True)
+
+    if 'ipgroup' in filtered_df.columns:
+        ip_df = filtered_df['ipgroup'].fillna('Non-IP / Not Specified').value_counts().reset_index()
+        ip_df.columns = ['Group', 'Count']
+        fig_ip = px.bar(
+            ip_df, x='Group', y='Count', text_auto=True, title="Dengue Cases by Indigenous Peoples (IP) Group"
+        )
+        fig_ip.update_traces(marker_color='#059669')
+        fig_ip.update_layout(height=450)
+        st.plotly_chart(fig_ip, use_container_width=True)
+
+with tab3:
+    class_counts = filtered_df["ClinClass"].value_counts().reset_index()
+    class_counts.columns = ["Classification", "Count"]
+    color_map = {"NO WARNING SIGNS": "#10b981", "WITH WARNING SIGNS": "#f59e0b", "SEVERE DENGUE": "#ef4444"}
+    
+    fig_pie = px.pie(
+        class_counts, names="Classification", values="Count", hole=0.45, 
+        title="Clinical Severity Classification", color="Classification", color_discrete_map=color_map
+    )
+    fig_pie.update_layout(height=500)
+    st.plotly_chart(fig_pie, use_container_width=True)
+
+    if 'DRU' in filtered_df.columns:
+        dru_counts = filtered_df["DRU"].fillna("Unspecified").value_counts().reset_index()
+        dru_counts.columns = ["Facility Type", "Count"]
+        fig_dru = px.bar(
+            dru_counts, x="Facility Type", y="Count", text_auto=True, title="Cases by Disease Reporting Unit (DRU) Type"
+        )
+        fig_dru.update_traces(marker_color='#6366f1')
+        fig_dru.update_layout(height=450)
+        st.plotly_chart(fig_dru, use_container_width=True)
+
+    if 'LabTest' in filtered_df.columns and 'LabRes' in filtered_df.columns:
+        lab_counts = filtered_df.groupby(['LabTest', 'LabRes']).size().reset_index(name='Count')
+        fig_lab = px.bar(
+            lab_counts, x="LabTest", y="Count", color="LabRes", barmode="stack", title="Diagnostic Modality and Laboratory Results"
+        )
+        fig_lab.update_layout(height=500)
+        st.plotly_chart(fig_lab, use_container_width=True)
 
 with tab4:
-    # Check if we should render Municipality Level or Barangay Level
     if len(muncity_input) == 1:
         target_muni = muncity_input[0]
         st.subheader(f"Geographic Heatmap: Barangays in {target_muni}")
@@ -193,7 +271,6 @@ with tab4:
                 mapbox_style="carto-positron", zoom=11.5, opacity=0.85
             )
             
-            # Add text labels on map
             lons, lats, texts = [], [], []
             for feature in brgy_geojson['features']:
                 std_name = feature['properties']['Standard_Name']
@@ -228,7 +305,6 @@ with tab4:
                 mapbox_style="carto-positron", zoom=8.8, center={"lat": 17.58, "lon": 120.83}, opacity=0.85
             )
             
-            # Add text labels on map
             lons, lats, texts = [], [], []
             for feature in abra_geojson['features']:
                 std_name = feature['properties']['Standard_Name']
@@ -243,3 +319,18 @@ with tab4:
             st.plotly_chart(fig_map, use_container_width=True)
         else:
             st.error("Could not fetch the Abra geographic boundaries from the repository URLs.")
+
+with tab5:
+    st.subheader("Surveillance Line List")
+    st.caption("Detailed patient records based on current filters. Scroll horizontally to view all columns.")
+    
+    display_cols = [
+        "PatientNumber", "FullName", "Muncity", "AgeYears", "Sex", 
+        "DOnset", "DAdmit", "DRU", "ClinClass", "LabTest", "LabRes", "Outcome"
+    ]
+    available_cols = [col for col in display_cols if col in filtered_df.columns]
+    
+    st.dataframe(
+        filtered_df[available_cols].sort_values("DOnset", ascending=False), 
+        use_container_width=True, hide_index=True, height=600
+    )
