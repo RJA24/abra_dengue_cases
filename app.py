@@ -3,8 +3,11 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import requests
+import re
+import unicodedata
 import numpy as np
 import json
+import os
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -35,9 +38,12 @@ ALL_ABRA_MUNICIPALITIES = [
 
 # --- Bulletproof Name Matching Algorithm ---
 def get_standard_muni_name(raw_name):
-    """Forces geojson names to match the dataset exactly via keyword matching."""
+    """Forces names to match exactly by checking keywords and stripping junk."""
     if not isinstance(raw_name, str): return ""
-    raw = raw_name.upper().replace("Ñ", "N")
+    raw = raw_name.upper()
+    raw = unicodedata.normalize('NFKD', raw).encode('ASCII', 'ignore').decode('utf-8')
+    raw = re.sub(r'[^A-Z]', '', raw)
+    
     if "LICUAN" in raw or "BAAY" in raw: return "LICUAN-BAAY"
     if "PENAR" in raw: return "PEÑARRUBIA"
     if "PAZ" in raw: return "LA PAZ"
@@ -45,9 +51,9 @@ def get_standard_muni_name(raw_name):
     if "ISIDRO" in raw: return "SAN ISIDRO"
     if "QUINTIN" in raw: return "SAN QUINTIN"
     
-    # Direct matches for single-word municipalities
     for muni in ALL_ABRA_MUNICIPALITIES:
-        if muni.replace("Ñ", "N") in raw:
+        clean_muni = muni.replace("Ñ", "N").replace("-", "")
+        if clean_muni in raw:
             return muni
     return raw_name
 
@@ -71,8 +77,15 @@ def load_data():
     sheet_id = "1IHdlNfzNtBAOk3LlDN2LstxlRmoGQNTRgF7vZ2P_t4U"
     csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
     df = pd.read_csv(csv_url)
+    
     if 'DOnset' in df.columns:
         df['DOnset'] = pd.to_datetime(df['DOnset'], errors='coerce')
+    
+    # FORCE CLEAN MUNICIPALITY NAMES AT LOAD TIME
+    if 'Muncity' in df.columns:
+        df['Muncity'] = df['Muncity'].astype(str).str.upper().str.strip()
+        df['Muncity'] = df['Muncity'].apply(get_standard_muni_name)
+        
     return df
 
 @st.cache_data(ttl="24h")
@@ -90,9 +103,7 @@ def fetch_muncity_geojson():
                 abra_features = []
                 for feature in data.get('features', []):
                     props = feature.get('properties', {})
-                    # Isolate Abra safely
                     if any('ABRA' in str(v).upper() for v in props.values()):
-                        # Standard keys for Municipality
                         muni_name = props.get('ADM3_EN', props.get('NAME_3', props.get('MUN_NAME', '')))
                         feature['properties']['Standard_Name'] = get_standard_muni_name(muni_name)
                         abra_features.append(feature)
@@ -102,28 +113,35 @@ def fetch_muncity_geojson():
             continue 
     return None
 
-@st.cache_data(ttl="24h")
+# Removed cache decorator here so it reads live and escapes the "Ghost Error"
 def fetch_barangay_geojson(target_municipality):
+    if not os.path.exists("abra_barangays.geojson"):
+        return None, "File 'abra_barangays.geojson' not found in the repository."
+    
     try:
-        with open("abra_barangays.geojson", "r") as f:
+        with open("abra_barangays.geojson", "r", encoding="utf-8") as f:
             data = json.load(f)
             features = []
             target = get_standard_muni_name(target_municipality)
             
             for feature in data.get('features', []):
                 props = feature.get('properties', {})
-                # HDX uses ADM3_EN for municipality, ADM4_EN for barangay
-                muni_name = props.get('ADM3_EN', props.get('mun_name', ''))
-                brgy_name = props.get('ADM4_EN', props.get('bgy_name', ''))
+                # Normalize keys just in case mapshaper changed casing
+                props_upper = {str(k).upper(): str(v).upper() for k, v in props.items()}
+                
+                muni_name = props_upper.get('ADM3_EN', props_upper.get('MUN_NAME', props_upper.get('NAME_3', '')))
+                brgy_name = props_upper.get('ADM4_EN', props_upper.get('BGY_NAME', props_upper.get('NAME_4', props_upper.get('BARANGAY', ''))))
                 
                 if get_standard_muni_name(muni_name) == target:
-                    # Clean barangay name for a direct match
                     feature['properties']['Standard_Name'] = str(brgy_name).upper().strip()
                     features.append(feature)
                     
-            return {"type": "FeatureCollection", "features": features} if features else None
-    except FileNotFoundError:
-        return None
+            if not features:
+                return None, f"Found the file, but no barangays matched the municipality: {target}"
+            return {"type": "FeatureCollection", "features": features}, None
+            
+    except Exception as e:
+        return None, f"Error reading file: {str(e)}"
 
 df = load_data()
 
@@ -221,7 +239,8 @@ with tab4:
     if len(muncity_input) == 1:
         target_muni = muncity_input[0]
         st.subheader(f"Geographic Heatmap: Barangays in {target_muni}")
-        brgy_geojson = fetch_barangay_geojson(target_muni)
+        
+        brgy_geojson, err_msg = fetch_barangay_geojson(target_muni)
         
         if brgy_geojson:
             map_data = filtered_df.groupby("Barangay").size().reset_index(name="Total Cases")
@@ -230,7 +249,7 @@ with tab4:
             fig_map = px.choropleth_mapbox(
                 map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
                 color='Total Cases', hover_name='Barangay', color_continuous_scale="Reds",
-                mapbox_style="carto-positron", zoom=11, opacity=0.85
+                mapbox_style="carto-positron", zoom=11.5, opacity=0.85
             )
             
             lons, lats, texts = [], [], []
@@ -246,7 +265,7 @@ with tab4:
             fig_map.update_layout(margin={"r":0,"t":40,"l":0,"b":0}, height=700)
             st.plotly_chart(fig_map, use_container_width=True)
         else:
-            st.info(f"Could not load `abra_barangays.geojson`. Make sure the file was downloaded from HDX and exists in your GitHub repo.")
+            st.error(f"Cannot display map. Reason: {err_msg}")
             
     else:
         st.subheader("Geographic Heatmap: Municipalities in Abra")
