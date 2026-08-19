@@ -8,8 +8,8 @@ import unicodedata
 import numpy as np
 import json
 import os
-import sqlite3
 import hashlib
+from streamlit_gsheets import GSheetsConnection
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -25,7 +25,7 @@ st.markdown("""
     .stApp { background-color: #f8fafc !important; color: #0f172a !important; }
     section[data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #e2e8f0; }
     .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: visible;}
+    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     h1, h2, h3, h4, h5, h6, span, p, label { color: #1e293b !important; }
     .js-plotly-plot { margin-bottom: 2rem; }
     div.row-widget.stRadio > div { flex-direction: row; align-items: center; justify-content: center; background: white; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
@@ -65,97 +65,77 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# DATABASE & AUTHENTICATION FUNCTIONS
+# GOOGLE SHEETS DATABASE FUNCTIONS
 # ==========================================
 
-def init_db():
-    conn = sqlite3.connect('pesu_users.db')
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            username TEXT PRIMARY KEY,
-            password TEXT NOT NULL,
-            role TEXT NOT NULL,
-            status TEXT NOT NULL
-        )
-    ''')
-    c.execute('SELECT COUNT(*) FROM users')
-    if c.fetchone()[0] == 0:
-        c.execute('INSERT INTO users (username, password, role, status) VALUES (?, ?, ?, ?)',
-                  ('admin', hash_password('admin123'), 'admin', 'approved'))
-    conn.commit()
-    conn.close()
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1IHdlNfzNtBAOk3LlDN2LstxlRmoGQNTRgF7vZ2P_t4U"
+
+def get_users_df():
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    df = conn.read(spreadsheet=SHEET_URL, worksheet="Users", usecols=[0, 1, 2, 3])
+    return df.dropna(subset=['username'])
+
+def save_users_df(df):
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    conn.update(spreadsheet=SHEET_URL, worksheet="Users", data=df)
+    st.cache_data.clear()
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def create_user(username, password):
-    conn = sqlite3.connect('pesu_users.db')
-    c = conn.cursor()
-    try:
-        c.execute('INSERT INTO users (username, password, role, status) VALUES (?, ?, ?, ?)',
-                  (username, hash_password(password), 'user', 'pending'))
-        conn.commit()
-        return True
-    except sqlite3.IntegrityError:
+    df = get_users_df()
+    if username in df['username'].values:
         return False
-    finally:
-        conn.close()
+    new_row = pd.DataFrame({
+        'username': [username], 
+        'password': [hash_password(password)], 
+        'role': ['user'], 
+        'status': ['pending']
+    })
+    updated_df = pd.concat([df, new_row], ignore_index=True)
+    save_users_df(updated_df)
+    return True
 
 def authenticate(username, password):
-    conn = sqlite3.connect('pesu_users.db')
-    c = conn.cursor()
-    c.execute('SELECT password, role, status FROM users WHERE username=?', (username,))
-    record = c.fetchone()
-    conn.close()
-    if record and record[0] == hash_password(password):
-        return record[1], record[2]
+    df = get_users_df()
+    user_row = df[df['username'] == username]
+    if not user_row.empty:
+        if user_row.iloc[0]['password'] == hash_password(password):
+            return user_row.iloc[0]['role'], user_row.iloc[0]['status']
     return None, None
 
 def get_all_users():
-    conn = sqlite3.connect('pesu_users.db')
-    df = pd.read_sql_query("SELECT username, role, status FROM users WHERE username != 'admin'", conn)
-    conn.close()
-    return df
+    df = get_users_df()
+    return df[df['username'] != 'admin']
 
 def update_user_status(username, new_status):
-    conn = sqlite3.connect('pesu_users.db')
-    c = conn.cursor()
-    c.execute('UPDATE users SET status=? WHERE username=?', (new_status, username))
-    conn.commit()
-    conn.close()
+    df = get_users_df()
+    df.loc[df['username'] == username, 'status'] = new_status
+    save_users_df(df)
 
 def update_user_role(username, new_role):
-    conn = sqlite3.connect('pesu_users.db')
-    c = conn.cursor()
-    c.execute('UPDATE users SET role=? WHERE username=?', (new_role, username))
-    conn.commit()
-    conn.close()
+    df = get_users_df()
+    df.loc[df['username'] == username, 'role'] = new_role
+    save_users_df(df)
 
 def delete_user(username):
-    conn = sqlite3.connect('pesu_users.db')
-    c = conn.cursor()
-    c.execute('DELETE FROM users WHERE username=?', (username,))
-    conn.commit()
-    conn.close()
+    df = get_users_df()
+    df = df[df['username'] != username]
+    save_users_df(df)
 
 def update_credentials(old_username, new_username, new_password):
-    conn = sqlite3.connect('pesu_users.db')
-    c = conn.cursor()
-    try:
-        if new_password:
-            c.execute('UPDATE users SET username=?, password=? WHERE username=?', 
-                      (new_username, hash_password(new_password), old_username))
-        else:
-            c.execute('UPDATE users SET username=? WHERE username=?', (new_username, old_username))
-        conn.commit()
-        return True
-    except sqlite3.IntegrityError:
+    df = get_users_df()
+    if new_username != old_username and new_username in df['username'].values:
         return False
-    finally:
-        conn.close()
-
-init_db()
+    
+    if new_password:
+        df.loc[df['username'] == old_username, ['username', 'password']] = [new_username, hash_password(new_password)]
+    else:
+        df.loc[df['username'] == old_username, 'username'] = new_username
+    
+    save_users_df(df)
+    return True
 
 # ==========================================
 # SESSION STATE INITIALIZATION
@@ -249,8 +229,7 @@ def get_polygon_centroid(geometry):
 
 @st.cache_data(ttl=600)
 def load_data():
-    sheet_id = "1IHdlNfzNtBAOk3LlDN2LstxlRmoGQNTRgF7vZ2P_t4U"
-    csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+    csv_url = f"{SHEET_URL}/export?format=csv&gid=0"  # Assuming Dengue data is the first sheet (gid=0)
     df = pd.read_csv(csv_url)
     if 'DOnset' in df.columns: df['DOnset'] = pd.to_datetime(df['DOnset'], errors='coerce')
     if 'Muncity' in df.columns: df['Muncity'] = df['Muncity'].apply(clean_muni_name)
@@ -359,52 +338,55 @@ def render_admin_panel():
     st.title("Admin Control Panel")
     st.caption("Manage user access and edit roles.")
     
-    users_df = get_all_users()
-    
-    if not users_df.empty:
-        for index, row in users_df.iterrows():
-            with st.container():
-                col_user, col_role, col_actions = st.columns([2, 2, 3])
-                
-                with col_user:
-                    st.write(f"**{row['username']}**")
-                    if row['status'] == 'pending':
-                        st.warning("PENDING", icon="⏳")
-                    else:
-                        st.success("APPROVED", icon="✅")
-                        
-                with col_role:
-                    role_options = ["user", "admin"]
-                    current_idx = role_options.index(row['role']) if row['role'] in role_options else 0
+    try:
+        users_df = get_all_users()
+        
+        if not users_df.empty:
+            for index, row in users_df.iterrows():
+                with st.container():
+                    col_user, col_role, col_actions = st.columns([2, 2, 3])
                     
-                    selected_role = st.selectbox(
-                        "Role Assignment", 
-                        options=role_options, 
-                        index=current_idx, 
-                        key=f"role_{row['username']}",
-                        label_visibility="collapsed"
-                    )
-                    
-                    if selected_role != row['role']:
-                        if st.button("Save New Role", key=f"save_role_{row['username']}"):
-                            update_user_role(row['username'], selected_role)
-                            st.rerun()
-
-                with col_actions:
-                    c1, c2 = st.columns(2)
-                    with c1:
+                    with col_user:
+                        st.write(f"**{row['username']}**")
                         if row['status'] == 'pending':
-                            if st.button("Approve", key=f"app_{row['username']}", use_container_width=True):
-                                update_user_status(row['username'], 'approved')
+                            st.warning("PENDING", icon="⏳")
+                        else:
+                            st.success("APPROVED", icon="✅")
+                            
+                    with col_role:
+                        role_options = ["user", "admin"]
+                        current_idx = role_options.index(row['role']) if row['role'] in role_options else 0
+                        
+                        selected_role = st.selectbox(
+                            "Role Assignment", 
+                            options=role_options, 
+                            index=current_idx, 
+                            key=f"role_{row['username']}",
+                            label_visibility="collapsed"
+                        )
+                        
+                        if selected_role != row['role']:
+                            if st.button("Save New Role", key=f"save_role_{row['username']}"):
                                 update_user_role(row['username'], selected_role)
                                 st.rerun()
-                    with c2:
-                        if st.button("Delete User", key=f"del_{row['username']}", use_container_width=True):
-                            delete_user(row['username'])
-                            st.rerun()
-                st.markdown("---")
-    else:
-        st.info("No other users found in the database.")
+
+                    with col_actions:
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            if row['status'] == 'pending':
+                                if st.button("Approve", key=f"app_{row['username']}", use_container_width=True):
+                                    update_user_status(row['username'], 'approved')
+                                    update_user_role(row['username'], selected_role)
+                                    st.rerun()
+                        with c2:
+                            if st.button("Delete User", key=f"del_{row['username']}", use_container_width=True):
+                                delete_user(row['username'])
+                                st.rerun()
+                    st.markdown("---")
+        else:
+            st.info("No other users found in the database.")
+    except Exception as e:
+        st.error("Could not load users. Please check your Google Service Account configuration.")
 
 def render_settings():
     st.title("Account Settings")
@@ -491,7 +473,7 @@ def render_dengue():
         """
 
     col1, col2, col3, col4 = st.columns(4)
-    with col1: st.markdown(create_kpi_card("Total Confirmed Cases", f"{total_cases:,}", "#2563eb"), unsafe_allow_html=True)
+    with col1: st.markdown(create_kpi_card("Total Confirmed Cases", f"{total_cases:,}", "var(--primary-color)"), unsafe_allow_html=True)
     with col2: st.markdown(create_kpi_card("Total Fatalities", f"{total_deaths:,}", "#ef4444"), unsafe_allow_html=True)
     with col3: st.markdown(create_kpi_card("Average Age (Years)", avg_age, "#10b981"), unsafe_allow_html=True)
     with col4: st.markdown(create_kpi_card("Affected Municipalities", f"{affected_muni} / 27", "#f59e0b"), unsafe_allow_html=True)
