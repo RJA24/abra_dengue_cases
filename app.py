@@ -30,7 +30,7 @@ st.markdown("""
     .js-plotly-plot { margin-bottom: 2rem; }
     div.row-widget.stRadio > div { flex-direction: row; align-items: center; justify-content: center; background: white; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
     
-    /* Program Button Styling: Only targets "secondary" buttons on the main menu */
+    /* Program Button Styling: Uses native primary color for hover */
     button[kind="secondary"] {
         height: 150px;
         border-radius: 20px;
@@ -44,12 +44,12 @@ st.markdown("""
         color: #1e293b;
     }
     button[kind="secondary"]:hover {
-        border-color: #2563eb;
+        border-color: var(--primary-color);
         background-color: #f8fafc;
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     }
     button[kind="secondary"]:hover p {
-        color: #2563eb;
+        color: var(--primary-color);
     }
     </style>
 """, unsafe_allow_html=True)
@@ -112,6 +112,13 @@ def update_user_status(username, new_status):
     conn = sqlite3.connect('pesu_users.db')
     c = conn.cursor()
     c.execute('UPDATE users SET status=? WHERE username=?', (new_status, username))
+    conn.commit()
+    conn.close()
+
+def update_user_role(username, new_role):
+    conn = sqlite3.connect('pesu_users.db')
+    c = conn.cursor()
+    c.execute('UPDATE users SET role=? WHERE username=?', (new_role, username))
     conn.commit()
     conn.close()
 
@@ -311,7 +318,7 @@ def render_login():
                 else:
                     st.error("Invalid username or password.")
         
-        if st.button("Create new account", type="primary", use_container_width=True):
+        if st.button("Create new account", use_container_width=True):
             navigate('register')
 
 def render_register():
@@ -335,35 +342,55 @@ def render_register():
                     else:
                         st.error("Username already exists.")
                         
-        if st.button("Back to Login", type="primary", use_container_width=True):
+        if st.button("Back to Login", use_container_width=True):
             navigate('login')
 
 def render_admin_panel():
     st.title("Admin Control Panel")
-    st.caption("Manage user access and approvals here.")
+    st.caption("Manage user access and edit roles.")
     
     users_df = get_all_users()
     
     if not users_df.empty:
         for index, row in users_df.iterrows():
             with st.container():
-                col_user, col_status, col_actions = st.columns([2, 1, 2])
+                col_user, col_role, col_actions = st.columns([2, 2, 3])
+                
                 with col_user:
-                    st.write(f"**{row['username']}** (Role: {row['role']})")
-                with col_status:
+                    st.write(f"**{row['username']}**")
                     if row['status'] == 'pending':
-                        st.warning(row['status'].upper())
+                        st.warning("PENDING", icon="⏳")
                     else:
-                        st.success(row['status'].upper())
+                        st.success("APPROVED", icon="✅")
+                        
+                with col_role:
+                    role_options = ["user", "admin"]
+                    current_idx = role_options.index(row['role']) if row['role'] in role_options else 0
+                    
+                    selected_role = st.selectbox(
+                        "Role Assignment", 
+                        options=role_options, 
+                        index=current_idx, 
+                        key=f"role_{row['username']}",
+                        label_visibility="collapsed"
+                    )
+                    
+                    # If the admin changes the role dropdown for an existing user, show a save button
+                    if selected_role != row['role']:
+                        if st.button("Save New Role", key=f"save_role_{row['username']}", type="primary"):
+                            update_user_role(row['username'], selected_role)
+                            st.rerun()
+
                 with col_actions:
                     c1, c2 = st.columns(2)
                     with c1:
                         if row['status'] == 'pending':
                             if st.button("Approve", key=f"app_{row['username']}", type="primary", use_container_width=True):
                                 update_user_status(row['username'], 'approved')
+                                update_user_role(row['username'], selected_role) # Assigns whatever role is selected in the dropdown
                                 st.rerun()
                     with c2:
-                        if st.button("Delete", key=f"del_{row['username']}", type="primary", use_container_width=True):
+                        if st.button("Delete User", key=f"del_{row['username']}", use_container_width=True):
                             delete_user(row['username'])
                             st.rerun()
                 st.markdown("---")
@@ -397,7 +424,6 @@ def render_main_menu():
     col1, col2, col3 = st.columns(3, gap="large")
     
     with col1:
-        # Native Streamlit button stylized using the injected CSS for "secondary" types
         if st.button("Dengue", type="secondary", use_container_width=True):
             st.session_state.active_program = 'dengue'
             st.rerun()
@@ -427,7 +453,7 @@ def render_dengue():
             clin_input = st.multiselect("Clinical Classification:", options=df["ClinClass"].dropna().unique(), default=[])
             
         st.markdown("---")
-        if st.button("Refresh Data", type="primary", use_container_width=True):
+        if st.button("Refresh Data", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
@@ -453,7 +479,7 @@ def render_dengue():
         """
 
     col1, col2, col3, col4 = st.columns(4)
-    with col1: st.markdown(create_kpi_card("Total Confirmed Cases", f"{total_cases:,}", "#2563eb"), unsafe_allow_html=True)
+    with col1: st.markdown(create_kpi_card("Total Confirmed Cases", f"{total_cases:,}", "var(--primary-color)"), unsafe_allow_html=True)
     with col2: st.markdown(create_kpi_card("Total Fatalities", f"{total_deaths:,}", "#ef4444"), unsafe_allow_html=True)
     with col3: st.markdown(create_kpi_card("Average Age (Years)", avg_age, "#10b981"), unsafe_allow_html=True)
     with col4: st.markdown(create_kpi_card("Affected Municipalities", f"{affected_muni} / 27", "#f59e0b"), unsafe_allow_html=True)
@@ -467,14 +493,14 @@ def render_dengue():
         if "MorbidityWeek" in filtered_df.columns:
             cases_by_week = filtered_df.groupby("MorbidityWeek").size().reset_index(name="Case Count")
             fig_line = px.line(cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, title="Dengue Epidemic Curve by Morbidity Week")
-            fig_line.update_traces(line_color='#2563eb', marker=dict(size=10))
+            fig_line.update_traces(line_color='grey', marker=dict(size=10))
             fig_line.update_layout(height=500)
             st.plotly_chart(fig_line, use_container_width=True)
 
         if "MorbidityMonth" in filtered_df.columns:
             month_counts = filtered_df.groupby("MorbidityMonth").size().reset_index(name="Cases")
             fig_month = px.bar(month_counts, x="MorbidityMonth", y="Cases", text_auto=True, title="Dengue Cases by Morbidity Month")
-            fig_month.update_traces(marker_color='#1d4ed8')
+            fig_month.update_traces(marker_color='grey')
             fig_month.update_layout(height=450)
             st.plotly_chart(fig_month, use_container_width=True)
         
@@ -483,12 +509,12 @@ def render_dengue():
             muncity_counts = filtered_df["Muncity"].value_counts().reset_index()
             muncity_counts.columns = ["Municipality", "Count"]
             fig_bar = px.bar(muncity_counts, x="Municipality", y="Count", title="Total Cases per Municipality", text_auto=True)
-            fig_bar.update_traces(marker_color='#2563eb')
+            fig_bar.update_traces(marker_color='grey')
             fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, height=500)
             st.plotly_chart(fig_bar, use_container_width=True)
 
         if "AgeYears" in filtered_df.columns and "Sex" in filtered_df.columns:
-            fig_hist = px.histogram(filtered_df, x="AgeYears", nbins=25, title="Age and Sex Distribution of Cases", color="Sex", barmode="group", color_discrete_sequence=["#2563eb", "#ec4899"])
+            fig_hist = px.histogram(filtered_df, x="AgeYears", nbins=25, title="Age and Sex Distribution of Cases", color="Sex", barmode="group", color_discrete_sequence=["grey", "#ec4899"])
             fig_hist.update_layout(height=500)
             st.plotly_chart(fig_hist, use_container_width=True)
         
@@ -505,7 +531,7 @@ def render_dengue():
             dru_counts = filtered_df["DRU"].fillna("Unspecified").value_counts().reset_index()
             dru_counts.columns = ["Facility Type", "Count"]
             fig_dru = px.bar(dru_counts, x="Facility Type", y="Count", text_auto=True, title="Cases by Disease Reporting Unit (DRU) Type")
-            fig_dru.update_traces(marker_color='#6366f1')
+            fig_dru.update_traces(marker_color='grey')
             fig_dru.update_layout(height=450)
             st.plotly_chart(fig_dru, use_container_width=True)
 
@@ -545,7 +571,7 @@ def render_dengue():
                     lon, lat = get_polygon_centroid(feat['geometry'])
                     if lon is not None and lat is not None:
                         lons.append(lon); lats.append(lat)
-                        texts.append(f"{display_name.title()}<br>{int(cases)}")
+                        texts.append(f"{display_name.title()} {int(cases)}")
                 
                 cam_lat = np.mean(lats) if lats else 17.58
                 cam_lon = np.mean(lons) if lons else 120.83
@@ -582,7 +608,7 @@ def render_dengue():
                     lon, lat = get_polygon_centroid(feat['geometry'])
                     if lon is not None and lat is not None:
                         lons.append(lon); lats.append(lat)
-                        texts.append(f"{std_name.title()}<br>{int(cases)}")
+                        texts.append(f"{std_name.title()} {int(cases)}")
                         
                 fig_map = px.choropleth_mapbox(
                     map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
@@ -617,25 +643,27 @@ def main():
             render_login()
     else:
         # App-wide Top Navigation Bar
-        col_title, col_admin, col_settings, col_logout = st.columns([6, 1, 1, 1])
+        col_title, col_menu = st.columns([10, 1])
         with col_title:
             st.markdown(f"**Welcome, {st.session_state.username}** | Role: {st.session_state.role.title()}")
-        with col_admin:
-            if st.session_state.role == 'admin':
-                if st.button("Admin Panel", type="primary", use_container_width=True): navigate('admin')
-        with col_settings:
-            if st.button("Settings", type="primary", use_container_width=True): navigate('settings')
-        with col_logout:
-            if st.button("Logout", type="primary", use_container_width=True): logout()
+            
+        with col_menu:
+            # Consolidating buttons into a compact popover menu
+            with st.popover("⚙️ Menu", use_container_width=True):
+                if st.session_state.role == 'admin':
+                    if st.button("Admin Panel", use_container_width=True): navigate('admin')
+                if st.button("Account Settings", use_container_width=True): navigate('settings')
+                st.markdown("---")
+                if st.button("Log Out", type="primary", use_container_width=True): logout()
             
         st.markdown("---")
 
         # Routing the content below the navigation bar
         if st.session_state.current_page == 'admin' and st.session_state.role == 'admin':
-            if st.button("← Back to Menu", type="primary", use_container_width=True): navigate('main_menu')
+            if st.button("← Back to Dashboard", use_container_width=False): navigate('main_menu')
             render_admin_panel()
         elif st.session_state.current_page == 'settings':
-            if st.button("← Back to Menu", type="primary", use_container_width=True): navigate('main_menu')
+            if st.button("← Back to Dashboard", use_container_width=False): navigate('main_menu')
             render_settings()
         else:
             # Main Application Area
