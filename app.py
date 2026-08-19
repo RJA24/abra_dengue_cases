@@ -666,7 +666,7 @@ def main():
             
         with col_menu:
             # Replaced the giant Popover with a compact, standard-sized settings drop-down
-            with st.popover("⚙️ Settings"):
+            with st.popover("⚙️"):
                 if st.session_state.role == 'admin':
                     if st.button("Admin Panel", use_container_width=True): navigate('admin')
                 if st.button("Account Settings", use_container_width=True): navigate('settings')
