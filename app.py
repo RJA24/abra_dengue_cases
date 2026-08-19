@@ -416,6 +416,27 @@ def render_settings():
                             st.error("Username already taken.")
 
 def render_main_menu():
+
+    # ---------------------------------------------------------
+    # 🎨 BACKGROUND IMAGE INJECTION
+    # ---------------------------------------------------------
+    bg_css = """
+    <style>
+    .stApp {
+        background: linear-gradient(
+            rgba(240, 242, 246, 0.8), 
+            rgba(240, 242, 246, 0.8)
+        ), 
+        url("https://github.com/RJA24/abra_sia_2026/blob/main/Abra%20(2).png?raw=true") !important;
+        background-size: cover !important;
+        background-position: center !important;
+        background-attachment: fixed !important;
+    }
+    header[data-testid="stHeader"] { background: rgba(0,0,0,0) !important; }
+    </style>
+    """
+    # ---------------------------------------------------------
+
     st.markdown("<h1 style='text-align: center; font-size: 3rem; margin-bottom: 50px;'>Provincial Epidemiology and Surveillance Unit</h1>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns(3, gap="large")
