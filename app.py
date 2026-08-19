@@ -18,51 +18,39 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- Dynamic CSS Styling (Native Dark/Light Mode Supported) ---
+# --- Clean, Professional CSS tailored to your TOML ---
 st.markdown("""
     <style>
-    /* Pulled the top padding up so the title sits higher */
-    .block-container { padding-top: 1rem; padding-bottom: 2rem; }
+    /* Adjust top padding to pull title higher */
+    .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
     
-    /* Made the header transparent so the sidebar toggle works, but it doesn't block UI */
+    /* Hide default header/footer for a clean app feel */
     header { background: transparent !important; }
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;} 
+    #MainMenu {visibility: hidden;} 
+    footer {visibility: hidden;} 
     
     .js-plotly-plot { margin-bottom: 2rem; }
-    div.row-widget.stRadio > div { flex-direction: row; align-items: center; justify-content: center; background: var(--secondary-background-color); padding: 10px; border-radius: 8px; border: 1px solid var(--faint-text-color); }
+    div.row-widget.stRadio > div { flex-direction: row; align-items: center; justify-content: center; background: #ffffff; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
     
-    /* Clean button overrides utilizing Streamlit's dynamic CSS variables */
-    .stButton > button, .stPopover > button {
-        color: var(--text-color) !important;
-        border-color: var(--faint-text-color) !important;
-        background-color: var(--secondary-background-color) !important;
-    }
-    .stButton > button:hover, .stPopover > button:hover {
-        border-color: var(--primary-color) !important;
-        color: var(--primary-color) !important;
-        background-color: var(--background-color) !important;
-        box-shadow: none !important;
-    }
-
-    /* Giant Program Buttons */
+    /* Giant Program Buttons styling */
     div.element-container:has(.big-btn-marker) + div.element-container button {
-        height: 150px !important;
-        border-radius: 15px !important;
-        border: 2px solid var(--text-color) !important;
-        background-color: var(--secondary-background-color) !important;
-        transition: all 0.3s ease !important;
+        height: 140px !important;
+        border-radius: 12px !important;
+        border: 1px solid #cbd5e1 !important;
+        background-color: #ffffff !important;
+        transition: all 0.2s ease-in-out !important;
     }
     div.element-container:has(.big-btn-marker) + div.element-container button p {
-        font-size: 28px !important;
-        font-weight: bold !important;
-        color: var(--text-color) !important;
+        font-size: 24px !important;
+        font-weight: 600 !important;
+        color: #0f172a !important;
     }
     div.element-container:has(.big-btn-marker) + div.element-container button:hover {
-        border-color: var(--primary-color) !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+        border-color: #2563eb !important;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15) !important;
     }
     div.element-container:has(.big-btn-marker) + div.element-container button:hover p {
-        color: var(--primary-color) !important;
+        color: #2563eb !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -363,9 +351,9 @@ def render_admin_panel():
                     with col_user:
                         st.write(f"**{row['username']}**")
                         if row['status'] == 'pending':
-                            st.warning("PENDING", icon="⏳")
+                            st.warning("PENDING")
                         else:
-                            st.success("APPROVED", icon="✅")
+                            st.success("APPROVED")
                             
                     with col_role:
                         role_options = ["user", "admin"]
@@ -449,11 +437,12 @@ def render_main_menu():
 
 def render_dengue():
     with st.sidebar:
-        if st.button("← Back to Main Menu", use_container_width=True):
+        if st.button("Back to Menu", use_container_width=True):
             st.session_state.active_program = None
             st.rerun()
             
-        st.markdown("### 📊 Surveillance Filters")
+        st.markdown("---")
+        st.markdown("### Surveillance Filters")
         
         df = load_data()
         muni_options = ["All Municipalities"] + sorted(df["Muncity"].dropna().unique().tolist())
@@ -481,9 +470,9 @@ def render_dengue():
 
     def create_kpi_card(title, value, border_color):
         return f"""
-        <div style="background-color: var(--secondary-background-color); padding: 22px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid var(--faint-text-color); border-left: 6px solid {border_color}; text-align: center;">
-            <p style="margin: 0; font-size: 1rem; color: var(--text-color); opacity: 0.8; font-weight: 600; text-transform: uppercase;">{title}</p>
-            <h2 style="margin: 10px 0 0 0; font-size: 2.6rem; color: var(--text-color); font-weight: 800;">{value}</h2>
+        <div style="background-color: #ffffff; padding: 22px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; border-left: 6px solid {border_color}; text-align: center;">
+            <p style="margin: 0; font-size: 0.9rem; color: #64748b; font-weight: 600; text-transform: uppercase;">{title}</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 2.4rem; color: #0f172a; font-weight: 800;">{value}</h2>
         </div>
         """
 
@@ -498,7 +487,6 @@ def render_dengue():
         "Epidemiological Trends", "Demographics & Geography", "Clinical & Laboratory", "Choropleth Map", "Raw Line List"
     ])
 
-    # Added theme="streamlit" to all plotly charts so they automatically adapt to light/dark mode!
     with tab1:
         if "MorbidityWeek" in filtered_df.columns:
             cases_by_week = filtered_df.groupby("MorbidityWeek").size().reset_index(name="Case Count")
@@ -597,7 +585,7 @@ def render_dengue():
                 
                 fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
                 fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
-                st.plotly_chart(fig_map, use_container_width=True, theme="streamlit")
+                st.plotly_chart(fig_map, use_container_width=True)
             else:
                 st.error(err if err else "Barangay column missing in data.")
                 
@@ -631,7 +619,7 @@ def render_dengue():
 
                 fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
                 fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
-                st.plotly_chart(fig_map, use_container_width=True, theme="streamlit")
+                st.plotly_chart(fig_map, use_container_width=True)
             else:
                 st.error("Could not fetch the Abra geographic boundaries.")
 
@@ -652,29 +640,27 @@ def main():
         else:
             render_login()
     else:
-        # --- SIDEBAR TOP HEADER: Cleanly isolated profile and account actions ---
+        # --- Clean, Emoji-Free Sidebar Menu ---
         with st.sidebar:
             st.markdown(f"### 👤 {st.session_state.username}")
-            st.markdown(f"**Role:** {st.session_state.role.title()}")
+            st.caption(f"Role: {st.session_state.role.title()}")
             st.markdown("<br>", unsafe_allow_html=True)
             
             if st.session_state.role == 'admin':
-                if st.button("🛡️ Admin Panel", use_container_width=True): navigate('admin')
-            if st.button("⚙️ Account Settings", use_container_width=True): navigate('settings')
-            if st.button("🚪 Log Out", use_container_width=True): logout()
+                if st.button("Admin Panel", use_container_width=True): navigate('admin')
+            if st.button("Account Settings", use_container_width=True): navigate('settings')
+            if st.button("Log Out", use_container_width=True): logout()
             
             st.divider()
 
-        # --- ROUTING LOGIC FOR MAIN CONTENT ---
         if st.session_state.current_page == 'admin' and st.session_state.role == 'admin':
-            if st.button("← Back to Dashboard"): navigate('main_menu')
+            if st.button("Back to Menu"): navigate('main_menu')
             render_admin_panel()
         elif st.session_state.current_page == 'settings':
-            if st.button("← Back to Dashboard"): navigate('main_menu')
+            if st.button("Back to Menu"): navigate('main_menu')
             render_settings()
         else:
             if st.session_state.active_program == 'dengue':
-                # Calling render_dengue will safely append the "Back" button and filters into the sidebar BELOW the divider
                 render_dengue()
             else:
                 render_main_menu()
