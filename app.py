@@ -494,14 +494,14 @@ def render_dengue():
         if "MorbidityWeek" in filtered_df.columns:
             cases_by_week = filtered_df.groupby("MorbidityWeek").size().reset_index(name="Case Count")
             fig_line = px.line(cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, title="Dengue Epidemic Curve by Morbidity Week")
-            fig_line.update_traces(line_color='#2563eb', marker=dict(size=10))
+            fig_line.update_traces(line_color="#eb9c25", marker=dict(size=10))
             fig_line.update_layout(height=500)
             st.plotly_chart(fig_line, use_container_width=True)
 
         if "MorbidityMonth" in filtered_df.columns:
             month_counts = filtered_df.groupby("MorbidityMonth").size().reset_index(name="Cases")
             fig_month = px.bar(month_counts, x="MorbidityMonth", y="Cases", text_auto=True, title="Dengue Cases by Morbidity Month")
-            fig_month.update_traces(marker_color='#1d4ed8')
+            fig_month.update_traces(marker_color="#d81d1d")
             fig_month.update_layout(height=450)
             st.plotly_chart(fig_month, use_container_width=True)
         
@@ -510,7 +510,7 @@ def render_dengue():
             muncity_counts = filtered_df["Muncity"].value_counts().reset_index()
             muncity_counts.columns = ["Municipality", "Count"]
             fig_bar = px.bar(muncity_counts, x="Municipality", y="Count", title="Total Cases per Municipality", text_auto=True)
-            fig_bar.update_traces(marker_color='#2563eb')
+            fig_bar.update_traces(marker_color="#eb2525")
             fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, height=500)
             st.plotly_chart(fig_bar, use_container_width=True)
 
