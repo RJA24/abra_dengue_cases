@@ -14,7 +14,6 @@ from streamlit_gsheets import GSheetsConnection
 # --- Page Configuration ---
 st.set_page_config(
     page_title="Abra PESU Portal", 
-    page_icon="https://github.com/RJA24/abra_sia_2026/blob/main/PHO%20logo.png?raw=true",
     layout="wide", 
     initial_sidebar_state="expanded"
 )
@@ -416,10 +415,7 @@ def render_settings():
                             st.error("Username already taken.")
 
 def render_main_menu():
-
-    # ---------------------------------------------------------
-    # 🎨 BACKGROUND IMAGE INJECTION
-    # ---------------------------------------------------------
+    # --- BACKGROUND IMAGE INJECTION ---
     bg_css = """
     <style>
     .stApp {
@@ -435,7 +431,8 @@ def render_main_menu():
     header[data-testid="stHeader"] { background: rgba(0,0,0,0) !important; }
     </style>
     """
-    # ---------------------------------------------------------
+    st.markdown(bg_css, unsafe_allow_html=True)  # <-- This is the crucial line you were missing!
+    # ----------------------------------
 
     st.markdown("<h1 style='text-align: center; font-size: 3rem; margin-bottom: 50px;'>Provincial Epidemiology and Surveillance Unit</h1>", unsafe_allow_html=True)
     
@@ -468,7 +465,7 @@ def render_dengue():
         
         df = load_data()
         
-        with st.expander("Filter Options", expanded=False):
+        with st.expander("Filter Options", expanded=True):
             muni_options = ["All Municipalities"] + sorted(df["Muncity"].dropna().unique().tolist())
             muncity_input = st.selectbox("Select Municipality:", options=muni_options, index=0)
             sex_input = st.multiselect("Select Sex:", options=df["Sex"].dropna().unique(), default=[])
@@ -493,7 +490,6 @@ def render_dengue():
     affected_muni = filtered_df["Muncity"].nunique()
 
     def create_kpi_card(title, value, border_color):
-        # Using explicit independent border properties to securely bypass the HTML sanitizer.
         return f"""
         <div style="background-color: #ffffff; padding: 22px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; border-left: 8px solid {border_color}; text-align: center;">
             <p style="margin: 0; font-size: 1rem; color: #64748b; font-weight: 600; text-transform: uppercase;">{title}</p>
@@ -516,14 +512,14 @@ def render_dengue():
         if "MorbidityWeek" in filtered_df.columns:
             cases_by_week = filtered_df.groupby("MorbidityWeek").size().reset_index(name="Case Count")
             fig_line = px.line(cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, title="Dengue Epidemic Curve by Morbidity Week")
-            fig_line.update_traces(line_color="#eb9525", marker=dict(size=10))
+            fig_line.update_traces(line_color='#2563eb', marker=dict(size=10))
             fig_line.update_layout(height=500)
             st.plotly_chart(fig_line, use_container_width=True)
 
         if "MorbidityMonth" in filtered_df.columns:
             month_counts = filtered_df.groupby("MorbidityMonth").size().reset_index(name="Cases")
             fig_month = px.bar(month_counts, x="MorbidityMonth", y="Cases", text_auto=True, title="Dengue Cases by Morbidity Month")
-            fig_month.update_traces(marker_color="#d8291d")
+            fig_month.update_traces(marker_color='#1d4ed8')
             fig_month.update_layout(height=450)
             st.plotly_chart(fig_month, use_container_width=True)
         
@@ -532,7 +528,7 @@ def render_dengue():
             muncity_counts = filtered_df["Muncity"].value_counts().reset_index()
             muncity_counts.columns = ["Municipality", "Count"]
             fig_bar = px.bar(muncity_counts, x="Municipality", y="Count", title="Total Cases per Municipality", text_auto=True)
-            fig_bar.update_traces(marker_color="#c325eb")
+            fig_bar.update_traces(marker_color='#2563eb')
             fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, height=500)
             st.plotly_chart(fig_bar, use_container_width=True)
 
@@ -554,7 +550,7 @@ def render_dengue():
             dru_counts = filtered_df["DRU"].fillna("Unspecified").value_counts().reset_index()
             dru_counts.columns = ["Facility Type", "Count"]
             fig_dru = px.bar(dru_counts, x="Facility Type", y="Count", text_auto=True, title="Cases by Disease Reporting Unit (DRU) Type")
-            fig_dru.update_traces(marker_color="#6366f1")
+            fig_dru.update_traces(marker_color='#6366f1')
             fig_dru.update_layout(height=450)
             st.plotly_chart(fig_dru, use_container_width=True)
 
