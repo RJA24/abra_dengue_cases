@@ -447,7 +447,7 @@ def render_dengue():
         df = load_data()
         
         # Secured the filters back into an expander cleanly
-        with st.expander("Filter Options", expanded=True):
+        with st.expander("Filter Options", expanded=False):
             muni_options = ["All Municipalities"] + sorted(df["Muncity"].dropna().unique().tolist())
             muncity_input = st.selectbox("Select Municipality:", options=muni_options, index=0)
             sex_input = st.multiselect("Select Sex:", options=df["Sex"].dropna().unique(), default=[])
