@@ -72,23 +72,31 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/1IHdlNfzNtBAOk3LlDN2LstxlRmo
 
 def get_users_df():
     conn = st.connection("gsheets", type=GSheetsConnection)
-    df = conn.read(spreadsheet=SHEET_URL, worksheet="Users", usecols=[0, 1, 2, 3])
-    return df.dropna(subset=['username'])
+    # ttl=0 completely disables caching so it ALWAYS reads the live sheet when logging in
+    df = conn.read(spreadsheet=SHEET_URL, worksheet="Users", usecols=[0, 1, 2, 3], ttl=0)
+    df = df.dropna(subset=['username'])
+    
+    # STRIP hidden spaces and force everything to string to prevent Google Sheets formatting errors
+    df['username'] = df['username'].astype(str).str.strip()
+    df['password'] = df['password'].astype(str).str.strip()
+    df['role'] = df['role'].astype(str).str.strip()
+    df['status'] = df['status'].astype(str).str.strip()
+    
+    return df
 
 def save_users_df(df):
     conn = st.connection("gsheets", type=GSheetsConnection)
     conn.update(spreadsheet=SHEET_URL, worksheet="Users", data=df)
-    st.cache_data.clear()
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def create_user(username, password):
     df = get_users_df()
-    if username in df['username'].values:
+    if username.strip() in df['username'].values:
         return False
     new_row = pd.DataFrame({
-        'username': [username], 
+        'username': [username.strip()], 
         'password': [hash_password(password)], 
         'role': ['user'], 
         'status': ['pending']
@@ -99,7 +107,7 @@ def create_user(username, password):
 
 def authenticate(username, password):
     df = get_users_df()
-    user_row = df[df['username'] == username]
+    user_row = df[df['username'] == username.strip()]
     if not user_row.empty:
         if user_row.iloc[0]['password'] == hash_password(password):
             return user_row.iloc[0]['role'], user_row.iloc[0]['status']
@@ -126,13 +134,15 @@ def delete_user(username):
 
 def update_credentials(old_username, new_username, new_password):
     df = get_users_df()
-    if new_username != old_username and new_username in df['username'].values:
+    clean_new_user = new_username.strip()
+    
+    if clean_new_user != old_username and clean_new_user in df['username'].values:
         return False
     
     if new_password:
-        df.loc[df['username'] == old_username, ['username', 'password']] = [new_username, hash_password(new_password)]
+        df.loc[df['username'] == old_username, ['username', 'password']] = [clean_new_user, hash_password(new_password)]
     else:
-        df.loc[df['username'] == old_username, 'username'] = new_username
+        df.loc[df['username'] == old_username, 'username'] = clean_new_user
     
     save_users_df(df)
     return True
@@ -229,7 +239,7 @@ def get_polygon_centroid(geometry):
 
 @st.cache_data(ttl=600)
 def load_data():
-    csv_url = f"{SHEET_URL}/export?format=csv&gid=0"  # Assuming Dengue data is the first sheet (gid=0)
+    csv_url = f"{SHEET_URL}/export?format=csv&gid=0"
     df = pd.read_csv(csv_url)
     if 'DOnset' in df.columns: df['DOnset'] = pd.to_datetime(df['DOnset'], errors='coerce')
     if 'Muncity' in df.columns: df['Muncity'] = df['Muncity'].apply(clean_muni_name)
