@@ -30,21 +30,26 @@ st.markdown("""
     .js-plotly-plot { margin-bottom: 2rem; }
     div.row-widget.stRadio > div { flex-direction: row; align-items: center; justify-content: center; background: white; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
     
-    /* Program Button Styling */
-    div.stButton > button.program-btn {
+    /* Program Button Styling: Only targets "secondary" buttons on the main menu */
+    button[kind="secondary"] {
         height: 150px;
-        font-size: 24px;
-        font-weight: bold;
         border-radius: 20px;
         border: 2px solid #1e293b;
         background-color: white;
-        color: #1e293b;
         transition: all 0.3s;
     }
-    div.stButton > button.program-btn:hover {
+    button[kind="secondary"] p {
+        font-size: 28px !important;
+        font-weight: bold;
+        color: #1e293b;
+    }
+    button[kind="secondary"]:hover {
         border-color: #2563eb;
-        color: #2563eb;
+        background-color: #f8fafc;
         box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+    }
+    button[kind="secondary"]:hover p {
+        color: #2563eb;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -64,7 +69,6 @@ def init_db():
             status TEXT NOT NULL
         )
     ''')
-    # Create default admin if table is empty
     c.execute('SELECT COUNT(*) FROM users')
     if c.fetchone()[0] == 0:
         c.execute('INSERT INTO users (username, password, role, status) VALUES (?, ?, ?, ?)',
@@ -95,7 +99,7 @@ def authenticate(username, password):
     record = c.fetchone()
     conn.close()
     if record and record[0] == hash_password(password):
-        return record[1], record[2] # role, status
+        return record[1], record[2]
     return None, None
 
 def get_all_users():
@@ -292,7 +296,7 @@ def render_login():
         with st.form("login_form"):
             username = st.text_input("Username")
             password = st.text_input("Password", type="password")
-            submitted = st.form_submit_button("Log In", use_container_width=True)
+            submitted = st.form_submit_button("Log In", type="primary", use_container_width=True)
             
             if submitted:
                 role, status = authenticate(username, password)
@@ -307,7 +311,7 @@ def render_login():
                 else:
                     st.error("Invalid username or password.")
         
-        if st.button("Create new account", use_container_width=True):
+        if st.button("Create new account", type="primary", use_container_width=True):
             navigate('register')
 
 def render_register():
@@ -318,7 +322,7 @@ def render_register():
             new_username = st.text_input("Choose Username")
             new_password = st.text_input("Choose Password", type="password")
             confirm_password = st.text_input("Confirm Password", type="password")
-            submitted = st.form_submit_button("Request Access", use_container_width=True)
+            submitted = st.form_submit_button("Request Access", type="primary", use_container_width=True)
             
             if submitted:
                 if new_password != confirm_password:
@@ -331,7 +335,7 @@ def render_register():
                     else:
                         st.error("Username already exists.")
                         
-        if st.button("Back to Login", use_container_width=True):
+        if st.button("Back to Login", type="primary", use_container_width=True):
             navigate('login')
 
 def render_admin_panel():
@@ -355,7 +359,7 @@ def render_admin_panel():
                     c1, c2 = st.columns(2)
                     with c1:
                         if row['status'] == 'pending':
-                            if st.button("Approve", key=f"app_{row['username']}", use_container_width=True):
+                            if st.button("Approve", key=f"app_{row['username']}", type="primary", use_container_width=True):
                                 update_user_status(row['username'], 'approved')
                                 st.rerun()
                     with c2:
@@ -376,7 +380,7 @@ def render_settings():
             new_password = st.text_input("New Password (leave blank to keep current)", type="password")
             confirm_password = st.text_input("Confirm New Password", type="password")
             
-            if st.form_submit_button("Update Account"):
+            if st.form_submit_button("Update Account", type="primary"):
                 if new_password and new_password != confirm_password:
                     st.error("New passwords do not match.")
                 else:
@@ -390,34 +394,25 @@ def render_settings():
 def render_main_menu():
     st.markdown("<h1 style='text-align: center; font-size: 3rem; margin-bottom: 50px;'>Provincial Epidemiology and Surveillance Unit</h1>", unsafe_allow_html=True)
     
-    # CSS wrapper for the big buttons to mimic the image
-    st.markdown('<div class="program-grid">', unsafe_allow_html=True)
-    
     col1, col2, col3 = st.columns(3, gap="large")
     
     with col1:
-        st.markdown('<button class="program-btn" style="width: 100%; height: 150px; font-size: 28px; border-radius: 15px; background: white; border: 2px solid black;">Dengue</button>', unsafe_allow_html=True)
-        # We use an invisible streamlit button over the CSS one to capture clicks
-        if st.button("Open Dengue", key="btn_dengue", use_container_width=True):
+        # Native Streamlit button stylized using the injected CSS for "secondary" types
+        if st.button("Dengue", type="secondary", use_container_width=True):
             st.session_state.active_program = 'dengue'
             st.rerun()
             
     with col2:
-        st.markdown('<button class="program-btn" style="width: 100%; height: 150px; font-size: 28px; border-radius: 15px; background: white; border: 2px solid black;">Place<br>Holder</button>', unsafe_allow_html=True)
-        if st.button("Open Placeholder 1", key="btn_p1", use_container_width=True):
-            pass # Add future logic here
+        if st.button("Place Holder 1", type="secondary", use_container_width=True):
+            pass
             
     with col3:
-        st.markdown('<button class="program-btn" style="width: 100%; height: 150px; font-size: 28px; border-radius: 15px; background: white; border: 2px solid black;">Place<br>Holder</button>', unsafe_allow_html=True)
-        if st.button("Open Placeholder 2", key="btn_p2", use_container_width=True):
-            pass # Add future logic here
-
-    st.markdown('</div>', unsafe_allow_html=True)
+        if st.button("Place Holder 2", type="secondary", use_container_width=True):
+            pass
 
 def render_dengue():
-    # --- Sidebar: Sidebar is injected ONLY when inside the Dengue Dashboard ---
     with st.sidebar:
-        if st.button("← Back to Menu", use_container_width=True):
+        if st.button("← Back to Menu", type="primary", use_container_width=True):
             st.session_state.active_program = None
             st.rerun()
             
@@ -432,7 +427,7 @@ def render_dengue():
             clin_input = st.multiselect("Clinical Classification:", options=df["ClinClass"].dropna().unique(), default=[])
             
         st.markdown("---")
-        if st.button("Refresh Data", use_container_width=True):
+        if st.button("Refresh Data", type="primary", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
@@ -627,20 +622,20 @@ def main():
             st.markdown(f"**Welcome, {st.session_state.username}** | Role: {st.session_state.role.title()}")
         with col_admin:
             if st.session_state.role == 'admin':
-                if st.button("Admin Panel", use_container_width=True): navigate('admin')
+                if st.button("Admin Panel", type="primary", use_container_width=True): navigate('admin')
         with col_settings:
-            if st.button("Settings", use_container_width=True): navigate('settings')
+            if st.button("Settings", type="primary", use_container_width=True): navigate('settings')
         with col_logout:
-            if st.button("Logout", use_container_width=True): logout()
+            if st.button("Logout", type="primary", use_container_width=True): logout()
             
         st.markdown("---")
 
         # Routing the content below the navigation bar
         if st.session_state.current_page == 'admin' and st.session_state.role == 'admin':
-            if st.button("← Back to Menu", use_container_width=True): navigate('main_menu')
+            if st.button("← Back to Menu", type="primary", use_container_width=True): navigate('main_menu')
             render_admin_panel()
         elif st.session_state.current_page == 'settings':
-            if st.button("← Back to Menu", use_container_width=True): navigate('main_menu')
+            if st.button("← Back to Menu", type="primary", use_container_width=True): navigate('main_menu')
             render_settings()
         else:
             # Main Application Area
