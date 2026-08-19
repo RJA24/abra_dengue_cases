@@ -18,13 +18,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS Styling ---
+# --- Dynamic CSS Styling (Native Dark/Light Mode Supported) ---
 st.markdown("""
     <style>
-    :root { color-scheme: light; }
-    .stApp { background-color: #f8fafc !important; color: #0f172a !important; }
-    section[data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #e2e8f0; }
-    
     /* Pulled the top padding up so the title sits higher */
     .block-container { padding-top: 1rem; padding-bottom: 2rem; }
     
@@ -32,40 +28,41 @@ st.markdown("""
     header { background: transparent !important; }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} 
     
-    h1, h2, h3, h4, h5, h6, span, p, label { color: #1e293b !important; }
     .js-plotly-plot { margin-bottom: 2rem; }
-    div.row-widget.stRadio > div { flex-direction: row; align-items: center; justify-content: center; background: white; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
+    div.row-widget.stRadio > div { flex-direction: row; align-items: center; justify-content: center; background: var(--secondary-background-color); padding: 10px; border-radius: 8px; border: 1px solid var(--faint-text-color); }
     
+    /* Clean button overrides utilizing Streamlit's dynamic CSS variables */
     .stButton > button, .stPopover > button {
-        color: #1e293b !important;
-        border-color: #cbd5e1 !important;
-        background-color: white !important;
+        color: var(--text-color) !important;
+        border-color: var(--faint-text-color) !important;
+        background-color: var(--secondary-background-color) !important;
     }
-    .stButton > button:hover, .stPopover > button:hover,
-    .stButton > button:focus, .stPopover > button:focus,
-    .stButton > button:active, .stPopover > button:active {
-        border-color: #1e293b !important;
-        color: #1e293b !important;
-        background-color: #f1f5f9 !important;
+    .stButton > button:hover, .stPopover > button:hover {
+        border-color: var(--primary-color) !important;
+        color: var(--primary-color) !important;
+        background-color: var(--background-color) !important;
         box-shadow: none !important;
     }
 
+    /* Giant Program Buttons */
     div.element-container:has(.big-btn-marker) + div.element-container button {
         height: 150px !important;
         border-radius: 15px !important;
-        border: 2px solid #1e293b !important;
-        background-color: white !important;
+        border: 2px solid var(--text-color) !important;
+        background-color: var(--secondary-background-color) !important;
         transition: all 0.3s ease !important;
     }
     div.element-container:has(.big-btn-marker) + div.element-container button p {
         font-size: 28px !important;
         font-weight: bold !important;
-        color: #1e293b !important;
+        color: var(--text-color) !important;
     }
     div.element-container:has(.big-btn-marker) + div.element-container button:hover {
-        background-color: #e2e8f0 !important;
-        border-color: #0f172a !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+        border-color: var(--primary-color) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+    }
+    div.element-container:has(.big-btn-marker) + div.element-container button:hover p {
+        color: var(--primary-color) !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -110,7 +107,6 @@ def create_user(username, password):
     return True
 
 def authenticate(username, password):
-    # MASTER OVERRIDE: GUARANTEED ADMIN ACCESS
     if username.strip() == 'admin' and password == 'admin123':
         return 'admin', 'approved'
         
@@ -453,22 +449,20 @@ def render_main_menu():
 
 def render_dengue():
     with st.sidebar:
-        if st.button("← Back to Menu", use_container_width=True):
+        if st.button("← Back to Main Menu", use_container_width=True):
             st.session_state.active_program = None
             st.rerun()
             
-        st.markdown("---")
-        st.markdown("### Surveillance Filters")
+        st.markdown("### 📊 Surveillance Filters")
         
         df = load_data()
-        with st.expander("Filter Options", expanded=True):
-            muni_options = ["All Municipalities"] + sorted(df["Muncity"].dropna().unique().tolist())
-            muncity_input = st.selectbox("Select Municipality:", options=muni_options, index=0)
-            sex_input = st.multiselect("Select Sex:", options=df["Sex"].dropna().unique(), default=[])
-            clin_input = st.multiselect("Clinical Classification:", options=df["ClinClass"].dropna().unique(), default=[])
+        muni_options = ["All Municipalities"] + sorted(df["Muncity"].dropna().unique().tolist())
+        muncity_input = st.selectbox("Select Municipality:", options=muni_options, index=0)
+        sex_input = st.multiselect("Select Sex:", options=df["Sex"].dropna().unique(), default=[])
+        clin_input = st.multiselect("Clinical Classification:", options=df["ClinClass"].dropna().unique(), default=[])
             
         st.markdown("---")
-        if st.button("Refresh Data", use_container_width=True):
+        if st.button("🔄 Refresh Data", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
@@ -487,14 +481,13 @@ def render_dengue():
 
     def create_kpi_card(title, value, border_color):
         return f"""
-        <div style="background-color: #ffffff; padding: 22px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; border-left: 6px solid {border_color}; text-align: center;">
-            <p style="margin: 0; font-size: 1rem; color: #64748b; font-weight: 600; text-transform: uppercase;">{title}</p>
-            <h2 style="margin: 10px 0 0 0; font-size: 2.6rem; color: #0f172a; font-weight: 800;">{value}</h2>
+        <div style="background-color: var(--secondary-background-color); padding: 22px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid var(--faint-text-color); border-left: 6px solid {border_color}; text-align: center;">
+            <p style="margin: 0; font-size: 1rem; color: var(--text-color); opacity: 0.8; font-weight: 600; text-transform: uppercase;">{title}</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 2.6rem; color: var(--text-color); font-weight: 800;">{value}</h2>
         </div>
         """
 
     col1, col2, col3, col4 = st.columns(4)
-    # Restored the vibrant #2563eb blue for the first KPI
     with col1: st.markdown(create_kpi_card("Total Confirmed Cases", f"{total_cases:,}", "#2563eb"), unsafe_allow_html=True)
     with col2: st.markdown(create_kpi_card("Total Fatalities", f"{total_deaths:,}", "#ef4444"), unsafe_allow_html=True)
     with col3: st.markdown(create_kpi_card("Average Age (Years)", avg_age, "#10b981"), unsafe_allow_html=True)
@@ -505,34 +498,35 @@ def render_dengue():
         "Epidemiological Trends", "Demographics & Geography", "Clinical & Laboratory", "Choropleth Map", "Raw Line List"
     ])
 
+    # Added theme="streamlit" to all plotly charts so they automatically adapt to light/dark mode!
     with tab1:
         if "MorbidityWeek" in filtered_df.columns:
             cases_by_week = filtered_df.groupby("MorbidityWeek").size().reset_index(name="Case Count")
             fig_line = px.line(cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, title="Dengue Epidemic Curve by Morbidity Week")
-            fig_line.update_traces(line_color='#2563eb', marker=dict(size=10)) # Restored Blue
+            fig_line.update_traces(line_color='#2563eb', marker=dict(size=10))
             fig_line.update_layout(height=500)
-            st.plotly_chart(fig_line, use_container_width=True)
+            st.plotly_chart(fig_line, use_container_width=True, theme="streamlit")
 
         if "MorbidityMonth" in filtered_df.columns:
             month_counts = filtered_df.groupby("MorbidityMonth").size().reset_index(name="Cases")
             fig_month = px.bar(month_counts, x="MorbidityMonth", y="Cases", text_auto=True, title="Dengue Cases by Morbidity Month")
-            fig_month.update_traces(marker_color='#1d4ed8') # Restored Dark Blue
+            fig_month.update_traces(marker_color='#1d4ed8')
             fig_month.update_layout(height=450)
-            st.plotly_chart(fig_month, use_container_width=True)
+            st.plotly_chart(fig_month, use_container_width=True, theme="streamlit")
         
     with tab2:
         if "Muncity" in filtered_df.columns:
             muncity_counts = filtered_df["Muncity"].value_counts().reset_index()
             muncity_counts.columns = ["Municipality", "Count"]
             fig_bar = px.bar(muncity_counts, x="Municipality", y="Count", title="Total Cases per Municipality", text_auto=True)
-            fig_bar.update_traces(marker_color='#2563eb') # Restored Blue
+            fig_bar.update_traces(marker_color='#2563eb')
             fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, height=500)
-            st.plotly_chart(fig_bar, use_container_width=True)
+            st.plotly_chart(fig_bar, use_container_width=True, theme="streamlit")
 
         if "AgeYears" in filtered_df.columns and "Sex" in filtered_df.columns:
-            fig_hist = px.histogram(filtered_df, x="AgeYears", nbins=25, title="Age and Sex Distribution of Cases", color="Sex", barmode="group", color_discrete_sequence=["#2563eb", "#ec4899"]) # Restored Blue/Pink
+            fig_hist = px.histogram(filtered_df, x="AgeYears", nbins=25, title="Age and Sex Distribution of Cases", color="Sex", barmode="group", color_discrete_sequence=["#2563eb", "#ec4899"])
             fig_hist.update_layout(height=500)
-            st.plotly_chart(fig_hist, use_container_width=True)
+            st.plotly_chart(fig_hist, use_container_width=True, theme="streamlit")
         
     with tab3:
         if "ClinClass" in filtered_df.columns:
@@ -541,15 +535,15 @@ def render_dengue():
             color_map = {"NO WARNING SIGNS": "#10b981", "WITH WARNING SIGNS": "#f59e0b", "SEVERE DENGUE": "#ef4444"}
             fig_pie = px.pie(class_counts, names="Classification", values="Count", hole=0.45, title="Clinical Severity Classification", color="Classification", color_discrete_map=color_map)
             fig_pie.update_layout(height=500)
-            st.plotly_chart(fig_pie, use_container_width=True)
+            st.plotly_chart(fig_pie, use_container_width=True, theme="streamlit")
 
         if 'DRU' in filtered_df.columns:
             dru_counts = filtered_df["DRU"].fillna("Unspecified").value_counts().reset_index()
             dru_counts.columns = ["Facility Type", "Count"]
             fig_dru = px.bar(dru_counts, x="Facility Type", y="Count", text_auto=True, title="Cases by Disease Reporting Unit (DRU) Type")
-            fig_dru.update_traces(marker_color='#6366f1') # Restored Indigo
+            fig_dru.update_traces(marker_color='#6366f1')
             fig_dru.update_layout(height=450)
-            st.plotly_chart(fig_dru, use_container_width=True)
+            st.plotly_chart(fig_dru, use_container_width=True, theme="streamlit")
 
     with tab4:
         map_style_choice = st.radio("Select Map Theme:", ["Light", "Street", "Satellite", "Dark"], horizontal=True)
@@ -603,7 +597,7 @@ def render_dengue():
                 
                 fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
                 fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
-                st.plotly_chart(fig_map, use_container_width=True)
+                st.plotly_chart(fig_map, use_container_width=True, theme="streamlit")
             else:
                 st.error(err if err else "Barangay column missing in data.")
                 
@@ -637,7 +631,7 @@ def render_dengue():
 
                 fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
                 fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
-                st.plotly_chart(fig_map, use_container_width=True)
+                st.plotly_chart(fig_map, use_container_width=True, theme="streamlit")
             else:
                 st.error("Could not fetch the Abra geographic boundaries.")
 
@@ -658,20 +652,20 @@ def main():
         else:
             render_login()
     else:
-        # Move User Profile and Settings Menu strictly into the Sidebar
+        # --- SIDEBAR TOP HEADER: Cleanly isolated profile and account actions ---
         with st.sidebar:
-            st.markdown(f"**👤 {st.session_state.username}**")
-            st.caption(f"Role: {st.session_state.role.title()}")
+            st.markdown(f"### 👤 {st.session_state.username}")
+            st.markdown(f"**Role:** {st.session_state.role.title()}")
+            st.markdown("<br>", unsafe_allow_html=True)
             
-            with st.expander("⚙️ Account Settings", expanded=False):
-                if st.session_state.role == 'admin':
-                    if st.button("Admin Panel", use_container_width=True): navigate('admin')
-                if st.button("Edit Profile", use_container_width=True): navigate('settings')
-                if st.button("Log Out", use_container_width=True): logout()
+            if st.session_state.role == 'admin':
+                if st.button("🛡️ Admin Panel", use_container_width=True): navigate('admin')
+            if st.button("⚙️ Account Settings", use_container_width=True): navigate('settings')
+            if st.button("🚪 Log Out", use_container_width=True): logout()
             
-            st.markdown("---")
+            st.divider()
 
-        # Routing the main content area (Top navigation is completely gone, pulling the title up)
+        # --- ROUTING LOGIC FOR MAIN CONTENT ---
         if st.session_state.current_page == 'admin' and st.session_state.role == 'admin':
             if st.button("← Back to Dashboard"): navigate('main_menu')
             render_admin_panel()
@@ -680,6 +674,7 @@ def main():
             render_settings()
         else:
             if st.session_state.active_program == 'dengue':
+                # Calling render_dengue will safely append the "Back" button and filters into the sidebar BELOW the divider
                 render_dengue()
             else:
                 render_main_menu()
