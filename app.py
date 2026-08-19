@@ -437,7 +437,7 @@ def render_main_menu():
 
 def render_dengue():
     with st.sidebar:
-        if st.button("Back to Menu", use_container_width=True):
+        if st.button("← Back to Menu", use_container_width=True):
             st.session_state.active_program = None
             st.rerun()
             
@@ -445,10 +445,13 @@ def render_dengue():
         st.markdown("### Surveillance Filters")
         
         df = load_data()
-        muni_options = ["All Municipalities"] + sorted(df["Muncity"].dropna().unique().tolist())
-        muncity_input = st.selectbox("Select Municipality:", options=muni_options, index=0)
-        sex_input = st.multiselect("Select Sex:", options=df["Sex"].dropna().unique(), default=[])
-        clin_input = st.multiselect("Clinical Classification:", options=df["ClinClass"].dropna().unique(), default=[])
+        
+        # Secured the filters back into an expander cleanly
+        with st.expander("Filter Options", expanded=True):
+            muni_options = ["All Municipalities"] + sorted(df["Muncity"].dropna().unique().tolist())
+            muncity_input = st.selectbox("Select Municipality:", options=muni_options, index=0)
+            sex_input = st.multiselect("Select Sex:", options=df["Sex"].dropna().unique(), default=[])
+            clin_input = st.multiselect("Clinical Classification:", options=df["ClinClass"].dropna().unique(), default=[])
             
         st.markdown("---")
         if st.button("🔄 Refresh Data", use_container_width=True):
@@ -470,9 +473,9 @@ def render_dengue():
 
     def create_kpi_card(title, value, border_color):
         return f"""
-        <div style="background-color: #ffffff; padding: 22px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; border-left: 6px solid {border_color}; text-align: center;">
-            <p style="margin: 0; font-size: 0.9rem; color: #64748b; font-weight: 600; text-transform: uppercase;">{title}</p>
-            <h2 style="margin: 10px 0 0 0; font-size: 2.4rem; color: #0f172a; font-weight: 800;">{value}</h2>
+        <div style="background-color: #ffffff; padding: 22px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; border-left: 8px solid {border_color} !important; text-align: center;">
+            <p style="margin: 0; font-size: 1rem; color: #64748b; font-weight: 600; text-transform: uppercase;">{title}</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 2.6rem; color: #0f172a; font-weight: 800;">{value}</h2>
         </div>
         """
 
@@ -493,14 +496,14 @@ def render_dengue():
             fig_line = px.line(cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, title="Dengue Epidemic Curve by Morbidity Week")
             fig_line.update_traces(line_color='#2563eb', marker=dict(size=10))
             fig_line.update_layout(height=500)
-            st.plotly_chart(fig_line, use_container_width=True, theme="streamlit")
+            st.plotly_chart(fig_line, use_container_width=True)
 
         if "MorbidityMonth" in filtered_df.columns:
             month_counts = filtered_df.groupby("MorbidityMonth").size().reset_index(name="Cases")
             fig_month = px.bar(month_counts, x="MorbidityMonth", y="Cases", text_auto=True, title="Dengue Cases by Morbidity Month")
             fig_month.update_traces(marker_color='#1d4ed8')
             fig_month.update_layout(height=450)
-            st.plotly_chart(fig_month, use_container_width=True, theme="streamlit")
+            st.plotly_chart(fig_month, use_container_width=True)
         
     with tab2:
         if "Muncity" in filtered_df.columns:
@@ -509,12 +512,12 @@ def render_dengue():
             fig_bar = px.bar(muncity_counts, x="Municipality", y="Count", title="Total Cases per Municipality", text_auto=True)
             fig_bar.update_traces(marker_color='#2563eb')
             fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, height=500)
-            st.plotly_chart(fig_bar, use_container_width=True, theme="streamlit")
+            st.plotly_chart(fig_bar, use_container_width=True)
 
         if "AgeYears" in filtered_df.columns and "Sex" in filtered_df.columns:
             fig_hist = px.histogram(filtered_df, x="AgeYears", nbins=25, title="Age and Sex Distribution of Cases", color="Sex", barmode="group", color_discrete_sequence=["#2563eb", "#ec4899"])
             fig_hist.update_layout(height=500)
-            st.plotly_chart(fig_hist, use_container_width=True, theme="streamlit")
+            st.plotly_chart(fig_hist, use_container_width=True)
         
     with tab3:
         if "ClinClass" in filtered_df.columns:
@@ -523,7 +526,7 @@ def render_dengue():
             color_map = {"NO WARNING SIGNS": "#10b981", "WITH WARNING SIGNS": "#f59e0b", "SEVERE DENGUE": "#ef4444"}
             fig_pie = px.pie(class_counts, names="Classification", values="Count", hole=0.45, title="Clinical Severity Classification", color="Classification", color_discrete_map=color_map)
             fig_pie.update_layout(height=500)
-            st.plotly_chart(fig_pie, use_container_width=True, theme="streamlit")
+            st.plotly_chart(fig_pie, use_container_width=True)
 
         if 'DRU' in filtered_df.columns:
             dru_counts = filtered_df["DRU"].fillna("Unspecified").value_counts().reset_index()
@@ -531,7 +534,7 @@ def render_dengue():
             fig_dru = px.bar(dru_counts, x="Facility Type", y="Count", text_auto=True, title="Cases by Disease Reporting Unit (DRU) Type")
             fig_dru.update_traces(marker_color='#6366f1')
             fig_dru.update_layout(height=450)
-            st.plotly_chart(fig_dru, use_container_width=True, theme="streamlit")
+            st.plotly_chart(fig_dru, use_container_width=True)
 
     with tab4:
         map_style_choice = st.radio("Select Map Theme:", ["Light", "Street", "Satellite", "Dark"], horizontal=True)
@@ -640,7 +643,7 @@ def main():
         else:
             render_login()
     else:
-        # --- Clean, Emoji-Free Sidebar Menu ---
+        # --- Clean, professional sidebar matching the TOML ---
         with st.sidebar:
             st.markdown(f"### 👤 {st.session_state.username}")
             st.caption(f"Role: {st.session_state.role.title()}")
@@ -653,6 +656,7 @@ def main():
             
             st.divider()
 
+        # --- Routing Logic ---
         if st.session_state.current_page == 'admin' and st.session_state.role == 'admin':
             if st.button("Back to Menu"): navigate('main_menu')
             render_admin_panel()
