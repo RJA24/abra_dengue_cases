@@ -8,27 +8,157 @@ import unicodedata
 import numpy as np
 import json
 import os
+import sqlite3
+import hashlib
 
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="Abra PESU | Dengue Surveillance", page_icon="https://github.com/RJA24/abra_sia_2026/blob/main/PHO%20logo.png?raw=true", 
+    page_title="Abra PESU Portal", 
     layout="wide", 
     initial_sidebar_state="expanded"
 )
 
+# --- CSS Styling (App, Map, and Large Menu Buttons) ---
 st.markdown("""
     <style>
     :root { color-scheme: light; }
     .stApp { background-color: #f8fafc !important; color: #0f172a !important; }
     section[data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #e2e8f0; }
     .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: visible;}
+    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     h1, h2, h3, h4, h5, h6, span, p, label { color: #1e293b !important; }
     .js-plotly-plot { margin-bottom: 2rem; }
     div.row-widget.stRadio > div { flex-direction: row; align-items: center; justify-content: center; background: white; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
+    
+    /* Program Button Styling */
+    div.stButton > button.program-btn {
+        height: 150px;
+        font-size: 24px;
+        font-weight: bold;
+        border-radius: 20px;
+        border: 2px solid #1e293b;
+        background-color: white;
+        color: #1e293b;
+        transition: all 0.3s;
+    }
+    div.stButton > button.program-btn:hover {
+        border-color: #2563eb;
+        color: #2563eb;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+    }
     </style>
 """, unsafe_allow_html=True)
 
+# ==========================================
+# DATABASE & AUTHENTICATION FUNCTIONS
+# ==========================================
+
+def init_db():
+    conn = sqlite3.connect('pesu_users.db')
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            password TEXT NOT NULL,
+            role TEXT NOT NULL,
+            status TEXT NOT NULL
+        )
+    ''')
+    # Create default admin if table is empty
+    c.execute('SELECT COUNT(*) FROM users')
+    if c.fetchone()[0] == 0:
+        c.execute('INSERT INTO users (username, password, role, status) VALUES (?, ?, ?, ?)',
+                  ('admin', hash_password('admin123'), 'admin', 'approved'))
+    conn.commit()
+    conn.close()
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def create_user(username, password):
+    conn = sqlite3.connect('pesu_users.db')
+    c = conn.cursor()
+    try:
+        c.execute('INSERT INTO users (username, password, role, status) VALUES (?, ?, ?, ?)',
+                  (username, hash_password(password), 'user', 'pending'))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
+
+def authenticate(username, password):
+    conn = sqlite3.connect('pesu_users.db')
+    c = conn.cursor()
+    c.execute('SELECT password, role, status FROM users WHERE username=?', (username,))
+    record = c.fetchone()
+    conn.close()
+    if record and record[0] == hash_password(password):
+        return record[1], record[2] # role, status
+    return None, None
+
+def get_all_users():
+    conn = sqlite3.connect('pesu_users.db')
+    df = pd.read_sql_query("SELECT username, role, status FROM users WHERE username != 'admin'", conn)
+    conn.close()
+    return df
+
+def update_user_status(username, new_status):
+    conn = sqlite3.connect('pesu_users.db')
+    c = conn.cursor()
+    c.execute('UPDATE users SET status=? WHERE username=?', (new_status, username))
+    conn.commit()
+    conn.close()
+
+def delete_user(username):
+    conn = sqlite3.connect('pesu_users.db')
+    c = conn.cursor()
+    c.execute('DELETE FROM users WHERE username=?', (username,))
+    conn.commit()
+    conn.close()
+
+def update_credentials(old_username, new_username, new_password):
+    conn = sqlite3.connect('pesu_users.db')
+    c = conn.cursor()
+    try:
+        if new_password:
+            c.execute('UPDATE users SET username=?, password=? WHERE username=?', 
+                      (new_username, hash_password(new_password), old_username))
+        else:
+            c.execute('UPDATE users SET username=? WHERE username=?', (new_username, old_username))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
+
+init_db()
+
+# ==========================================
+# SESSION STATE INITIALIZATION
+# ==========================================
+if 'logged_in' not in st.session_state: st.session_state.logged_in = False
+if 'username' not in st.session_state: st.session_state.username = ''
+if 'role' not in st.session_state: st.session_state.role = ''
+if 'current_page' not in st.session_state: st.session_state.current_page = 'login'
+if 'active_program' not in st.session_state: st.session_state.active_program = None
+
+def navigate(page):
+    st.session_state.current_page = page
+    st.rerun()
+
+def logout():
+    st.session_state.logged_in = False
+    st.session_state.username = ''
+    st.session_state.role = ''
+    st.session_state.active_program = None
+    navigate('login')
+
+# ==========================================
+# DENGUE DASHBOARD CORE FUNCTIONS
+# ==========================================
 ALL_ABRA_MUNICIPALITIES = [
     "BANGUED", "BOLINEY", "BUCAY", "BUCLOC", "DAGUIOMAN", "DANGLAS", "DOLORES",
     "LA PAZ", "LACUB", "LAGANGILANG", "LAGAYAN", "LANGIDEN", "LICUAN-BAAY",
@@ -37,23 +167,19 @@ ALL_ABRA_MUNICIPALITIES = [
     "TUBO", "VILLAVICIOSA"
 ]
 
-# --- Core Matching Algorithms ---
 def clean_muni_name(raw_name):
     if not isinstance(raw_name, str): return ""
     raw = str(raw_name).upper()
     raw = unicodedata.normalize('NFKD', raw).encode('ASCII', 'ignore').decode('utf-8')
     raw_alpha = re.sub(r'[^A-Z]', '', raw)
-    
     if "LICUAN" in raw_alpha or "BAAY" in raw_alpha: return "LICUAN-BAAY"
     if "PENAR" in raw_alpha or "RUBIA" in raw_alpha: return "PEÑARRUBIA"
     if "PAZ" in raw_alpha: return "LA PAZ"
     if "JUAN" in raw_alpha: return "SAN JUAN"
     if "ISIDRO" in raw_alpha: return "SAN ISIDRO"
     if "QUINTIN" in raw_alpha: return "SAN QUINTIN"
-    
     for muni in ALL_ABRA_MUNICIPALITIES:
-        if re.sub(r'[^A-Z]', '', muni.replace("Ñ", "N")) in raw_alpha:
-            return muni
+        if re.sub(r'[^A-Z]', '', muni.replace("Ñ", "N")) in raw_alpha: return muni
     return raw_name
 
 def clean_brgy_name(raw_name):
@@ -91,27 +217,20 @@ def get_polygon_centroid(geometry):
     try:
         coords = []
         if geometry['type'] == 'Polygon':
-            for ring in geometry['coordinates']:
-                coords.extend(ring)
+            for ring in geometry['coordinates']: coords.extend(ring)
         elif geometry['type'] == 'MultiPolygon':
             for poly in geometry['coordinates']:
-                for ring in poly:
-                    coords.extend(ring)
-        if not coords:
-            return None, None
-        
+                for ring in poly: coords.extend(ring)
+        if not coords: return None, None
         coords = np.array(coords)
         return float(np.mean(coords[:, 0])), float(np.mean(coords[:, 1]))
-    except:
-        return None, None
+    except: return None, None
 
-# --- Data Loading ---
 @st.cache_data(ttl=600)
 def load_data():
     sheet_id = "1IHdlNfzNtBAOk3LlDN2LstxlRmoGQNTRgF7vZ2P_t4U"
     csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
     df = pd.read_csv(csv_url)
-    
     if 'DOnset' in df.columns: df['DOnset'] = pd.to_datetime(df['DOnset'], errors='coerce')
     if 'Muncity' in df.columns: df['Muncity'] = df['Muncity'].apply(clean_muni_name)
     return df
@@ -158,197 +277,377 @@ def fetch_barangay_geojson(target_muni):
             return None, f"No barangays matched inside {target_muni}."
     except Exception as e: return None, str(e)
 
-df = load_data()
 
-# --- Sidebar Filters ---
-with st.sidebar:
-    st.markdown("### Surveillance Filters")
-    with st.expander("Filter Options", expanded=True):
-        muni_options = ["All Municipalities"] + sorted(df["Muncity"].dropna().unique().tolist())
-        muncity_input = st.selectbox("Select Municipality:", options=muni_options, index=0)
+# ==========================================
+# PAGE RENDERERS
+# ==========================================
+
+def render_login():
+    st.markdown("<h2 style='text-align: center;'>Provincial Epidemiology and Surveillance Unit</h2>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        st.markdown("### Secure Login")
+        with st.form("login_form"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            submitted = st.form_submit_button("Log In", use_container_width=True)
+            
+            if submitted:
+                role, status = authenticate(username, password)
+                if role:
+                    if status == 'approved':
+                        st.session_state.logged_in = True
+                        st.session_state.username = username
+                        st.session_state.role = role
+                        navigate('main_menu')
+                    else:
+                        st.error("Your account is pending admin approval.")
+                else:
+                    st.error("Invalid username or password.")
         
-        sex_input = st.multiselect("Select Sex:", options=df["Sex"].dropna().unique(), default=[])
-        clin_input = st.multiselect("Clinical Classification:", options=df["ClinClass"].dropna().unique(), default=[])
+        if st.button("Create new account", use_container_width=True):
+            navigate('register')
+
+def render_register():
+    st.markdown("<h2 style='text-align: center;'>Create an Account</h2>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        with st.form("register_form"):
+            new_username = st.text_input("Choose Username")
+            new_password = st.text_input("Choose Password", type="password")
+            confirm_password = st.text_input("Confirm Password", type="password")
+            submitted = st.form_submit_button("Request Access", use_container_width=True)
+            
+            if submitted:
+                if new_password != confirm_password:
+                    st.error("Passwords do not match.")
+                elif len(new_username) < 3 or len(new_password) < 6:
+                    st.error("Username (min 3) and Password (min 6) must be longer.")
+                else:
+                    if create_user(new_username, new_password):
+                        st.success("Account created! Please wait for an admin to approve your access.")
+                    else:
+                        st.error("Username already exists.")
+                        
+        if st.button("Back to Login", use_container_width=True):
+            navigate('login')
+
+def render_admin_panel():
+    st.title("Admin Control Panel")
+    st.caption("Manage user access and approvals here.")
+    
+    users_df = get_all_users()
+    
+    if not users_df.empty:
+        for index, row in users_df.iterrows():
+            with st.container():
+                col_user, col_status, col_actions = st.columns([2, 1, 2])
+                with col_user:
+                    st.write(f"**{row['username']}** (Role: {row['role']})")
+                with col_status:
+                    if row['status'] == 'pending':
+                        st.warning(row['status'].upper())
+                    else:
+                        st.success(row['status'].upper())
+                with col_actions:
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if row['status'] == 'pending':
+                            if st.button("Approve", key=f"app_{row['username']}", use_container_width=True):
+                                update_user_status(row['username'], 'approved')
+                                st.rerun()
+                    with c2:
+                        if st.button("Delete", key=f"del_{row['username']}", type="primary", use_container_width=True):
+                            delete_user(row['username'])
+                            st.rerun()
+                st.markdown("---")
+    else:
+        st.info("No other users found in the database.")
+
+def render_settings():
+    st.title("Account Settings")
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        with st.form("settings_form"):
+            st.subheader("Update Credentials")
+            new_username = st.text_input("New Username", value=st.session_state.username)
+            new_password = st.text_input("New Password (leave blank to keep current)", type="password")
+            confirm_password = st.text_input("Confirm New Password", type="password")
+            
+            if st.form_submit_button("Update Account"):
+                if new_password and new_password != confirm_password:
+                    st.error("New passwords do not match.")
+                else:
+                    success = update_credentials(st.session_state.username, new_username, new_password)
+                    if success:
+                        st.success("Credentials updated! Please log in again.")
+                        logout()
+                    else:
+                        st.error("Username already taken.")
+
+def render_main_menu():
+    st.markdown("<h1 style='text-align: center; font-size: 3rem; margin-bottom: 50px;'>Provincial Epidemiology and Surveillance Unit</h1>", unsafe_allow_html=True)
+    
+    # CSS wrapper for the big buttons to mimic the image
+    st.markdown('<div class="program-grid">', unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns(3, gap="large")
+    
+    with col1:
+        st.markdown('<button class="program-btn" style="width: 100%; height: 150px; font-size: 28px; border-radius: 15px; background: white; border: 2px solid black;">Dengue</button>', unsafe_allow_html=True)
+        # We use an invisible streamlit button over the CSS one to capture clicks
+        if st.button("Open Dengue", key="btn_dengue", use_container_width=True):
+            st.session_state.active_program = 'dengue'
+            st.rerun()
+            
+    with col2:
+        st.markdown('<button class="program-btn" style="width: 100%; height: 150px; font-size: 28px; border-radius: 15px; background: white; border: 2px solid black;">Place<br>Holder</button>', unsafe_allow_html=True)
+        if st.button("Open Placeholder 1", key="btn_p1", use_container_width=True):
+            pass # Add future logic here
+            
+    with col3:
+        st.markdown('<button class="program-btn" style="width: 100%; height: 150px; font-size: 28px; border-radius: 15px; background: white; border: 2px solid black;">Place<br>Holder</button>', unsafe_allow_html=True)
+        if st.button("Open Placeholder 2", key="btn_p2", use_container_width=True):
+            pass # Add future logic here
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def render_dengue():
+    # --- Sidebar: Sidebar is injected ONLY when inside the Dengue Dashboard ---
+    with st.sidebar:
+        if st.button("← Back to Menu", use_container_width=True):
+            st.session_state.active_program = None
+            st.rerun()
+            
+        st.markdown("---")
+        st.markdown("### Surveillance Filters")
         
+        df = load_data()
+        with st.expander("Filter Options", expanded=True):
+            muni_options = ["All Municipalities"] + sorted(df["Muncity"].dropna().unique().tolist())
+            muncity_input = st.selectbox("Select Municipality:", options=muni_options, index=0)
+            sex_input = st.multiselect("Select Sex:", options=df["Sex"].dropna().unique(), default=[])
+            clin_input = st.multiselect("Clinical Classification:", options=df["ClinClass"].dropna().unique(), default=[])
+            
+        st.markdown("---")
+        if st.button("Refresh Data", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+
+    muncity_filter = df["Muncity"].dropna().unique() if muncity_input == "All Municipalities" else [muncity_input]
+    sex_filter = sex_input if sex_input else df["Sex"].dropna().unique()
+    clin_filter = clin_input if clin_input else df["ClinClass"].dropna().unique()
+    filtered_df = df.query("Muncity in @muncity_filter & Sex in @sex_filter & ClinClass in @clin_filter")
+
+    st.title("Abra PESU: Dengue Surveillance Dashboard")
     st.markdown("---")
-    if st.button("Refresh Data", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
 
-muncity_filter = df["Muncity"].dropna().unique() if muncity_input == "All Municipalities" else [muncity_input]
-sex_filter = sex_input if sex_input else df["Sex"].dropna().unique()
-clin_filter = clin_input if clin_input else df["ClinClass"].dropna().unique()
-filtered_df = df.query("Muncity in @muncity_filter & Sex in @sex_filter & ClinClass in @clin_filter")
+    total_cases = len(filtered_df)
+    total_deaths = len(filtered_df[filtered_df["Outcome"] == "D"]) if "Outcome" in filtered_df.columns else 0
+    avg_age = round(filtered_df["AgeYears"].mean(), 1) if not filtered_df.empty and "AgeYears" in filtered_df.columns else 0
+    affected_muni = filtered_df["Muncity"].nunique()
 
-# --- Header & KPIs ---
-st.title("Abra PESU: Dengue Surveillance Dashboard")
-st.markdown("**Provincial Epidemiology and Surveillance Unit - Official Data Portal**")
-st.markdown("---")
+    def create_kpi_card(title, value, border_color):
+        return f"""
+        <div style="background-color: #ffffff; padding: 22px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; border-left: 6px solid {border_color}; text-align: center;">
+            <p style="margin: 0; font-size: 1rem; color: #64748b; font-weight: 600; text-transform: uppercase;">{title}</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 2.6rem; color: #0f172a; font-weight: 800;">{value}</h2>
+        </div>
+        """
 
-total_cases = len(filtered_df)
-total_deaths = len(filtered_df[filtered_df["Outcome"] == "D"]) if "Outcome" in filtered_df.columns else 0
-avg_age = round(filtered_df["AgeYears"].mean(), 1) if not filtered_df.empty and "AgeYears" in filtered_df.columns else 0
-affected_muni = filtered_df["Muncity"].nunique()
+    col1, col2, col3, col4 = st.columns(4)
+    with col1: st.markdown(create_kpi_card("Total Confirmed Cases", f"{total_cases:,}", "#2563eb"), unsafe_allow_html=True)
+    with col2: st.markdown(create_kpi_card("Total Fatalities", f"{total_deaths:,}", "#ef4444"), unsafe_allow_html=True)
+    with col3: st.markdown(create_kpi_card("Average Age (Years)", avg_age, "#10b981"), unsafe_allow_html=True)
+    with col4: st.markdown(create_kpi_card("Affected Municipalities", f"{affected_muni} / 27", "#f59e0b"), unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
 
-def create_kpi_card(title, value, border_color):
-    return f"""
-    <div style="background-color: #ffffff; padding: 22px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; border-left: 6px solid {border_color}; text-align: center;">
-        <p style="margin: 0; font-size: 1rem; color: #64748b; font-weight: 600; text-transform: uppercase;">{title}</p>
-        <h2 style="margin: 10px 0 0 0; font-size: 2.6rem; color: #0f172a; font-weight: 800;">{value}</h2>
-    </div>
-    """
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "Epidemiological Trends", "Demographics & Geography", "Clinical & Laboratory", "Choropleth Map", "Raw Line List"
+    ])
 
-col1, col2, col3, col4 = st.columns(4)
-with col1: st.markdown(create_kpi_card("Total Confirmed Cases", f"{total_cases:,}", "#2563eb"), unsafe_allow_html=True)
-with col2: st.markdown(create_kpi_card("Total Fatalities", f"{total_deaths:,}", "#ef4444"), unsafe_allow_html=True)
-with col3: st.markdown(create_kpi_card("Average Age (Years)", avg_age, "#10b981"), unsafe_allow_html=True)
-with col4: st.markdown(create_kpi_card("Affected Municipalities", f"{affected_muni} / 27", "#f59e0b"), unsafe_allow_html=True)
-st.markdown("<br>", unsafe_allow_html=True)
+    with tab1:
+        if "MorbidityWeek" in filtered_df.columns:
+            cases_by_week = filtered_df.groupby("MorbidityWeek").size().reset_index(name="Case Count")
+            fig_line = px.line(cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, title="Dengue Epidemic Curve by Morbidity Week")
+            fig_line.update_traces(line_color='#2563eb', marker=dict(size=10))
+            fig_line.update_layout(height=500)
+            st.plotly_chart(fig_line, use_container_width=True)
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "Epidemiological Trends", "Demographics & Geography", "Clinical & Laboratory", "Choropleth Map", "Raw Line List"
-])
-
-with tab1:
-    if "MorbidityWeek" in filtered_df.columns:
-        cases_by_week = filtered_df.groupby("MorbidityWeek").size().reset_index(name="Case Count")
-        fig_line = px.line(cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, title="Dengue Epidemic Curve by Morbidity Week")
-        fig_line.update_traces(line_color='#2563eb', marker=dict(size=10))
-        fig_line.update_layout(height=500)
-        st.plotly_chart(fig_line, use_container_width=True)
-
-    if "MorbidityMonth" in filtered_df.columns:
-        month_counts = filtered_df.groupby("MorbidityMonth").size().reset_index(name="Cases")
-        fig_month = px.bar(month_counts, x="MorbidityMonth", y="Cases", text_auto=True, title="Dengue Cases by Morbidity Month")
-        fig_month.update_traces(marker_color='#1d4ed8')
-        fig_month.update_layout(height=450)
-        st.plotly_chart(fig_month, use_container_width=True)
-    
-with tab2:
-    if "Muncity" in filtered_df.columns:
-        muncity_counts = filtered_df["Muncity"].value_counts().reset_index()
-        muncity_counts.columns = ["Municipality", "Count"]
-        fig_bar = px.bar(muncity_counts, x="Municipality", y="Count", title="Total Cases per Municipality", text_auto=True)
-        fig_bar.update_traces(marker_color='#2563eb')
-        fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, height=500)
-        st.plotly_chart(fig_bar, use_container_width=True)
-
-    if "AgeYears" in filtered_df.columns and "Sex" in filtered_df.columns:
-        fig_hist = px.histogram(filtered_df, x="AgeYears", nbins=25, title="Age and Sex Distribution of Cases", color="Sex", barmode="group", color_discrete_sequence=["#2563eb", "#ec4899"])
-        fig_hist.update_layout(height=500)
-        st.plotly_chart(fig_hist, use_container_width=True)
-    
-with tab3:
-    if "ClinClass" in filtered_df.columns:
-        class_counts = filtered_df["ClinClass"].value_counts().reset_index()
-        class_counts.columns = ["Classification", "Count"]
-        color_map = {"NO WARNING SIGNS": "#10b981", "WITH WARNING SIGNS": "#f59e0b", "SEVERE DENGUE": "#ef4444"}
-        fig_pie = px.pie(class_counts, names="Classification", values="Count", hole=0.45, title="Clinical Severity Classification", color="Classification", color_discrete_map=color_map)
-        fig_pie.update_layout(height=500)
-        st.plotly_chart(fig_pie, use_container_width=True)
-
-    if 'DRU' in filtered_df.columns:
-        dru_counts = filtered_df["DRU"].fillna("Unspecified").value_counts().reset_index()
-        dru_counts.columns = ["Facility Type", "Count"]
-        fig_dru = px.bar(dru_counts, x="Facility Type", y="Count", text_auto=True, title="Cases by Disease Reporting Unit (DRU) Type")
-        fig_dru.update_traces(marker_color='#6366f1')
-        fig_dru.update_layout(height=450)
-        st.plotly_chart(fig_dru, use_container_width=True)
-
-with tab4:
-    map_style_choice = st.radio("Select Map Theme:", ["Light", "Street", "Satellite", "Dark"], horizontal=True)
-    
-    style_map = {
-        "Light": "carto-positron",
-        "Street": "open-street-map",
-        "Dark": "carto-darkmatter",
-        "Satellite": "white-bg" 
-    }
-    label_color = 'white' if map_style_choice in ["Dark", "Satellite"] else 'black'
-
-    if muncity_input != "All Municipalities":
-        st.subheader(f"Geographic Heatmap: Barangays in {muncity_input}")
-        brgy_geojson, err = fetch_barangay_geojson(muncity_input)
+        if "MorbidityMonth" in filtered_df.columns:
+            month_counts = filtered_df.groupby("MorbidityMonth").size().reset_index(name="Cases")
+            fig_month = px.bar(month_counts, x="MorbidityMonth", y="Cases", text_auto=True, title="Dengue Cases by Morbidity Month")
+            fig_month.update_traces(marker_color='#1d4ed8')
+            fig_month.update_layout(height=450)
+            st.plotly_chart(fig_month, use_container_width=True)
         
-        if brgy_geojson and "Barangay" in filtered_df.columns:
-            all_geojson_brgys = [f['properties']['Standard_Name'] for f in brgy_geojson['features']]
-            all_geojson_originals = [f['properties']['Original_Name'] for f in brgy_geojson['features']]
+    with tab2:
+        if "Muncity" in filtered_df.columns:
+            muncity_counts = filtered_df["Muncity"].value_counts().reset_index()
+            muncity_counts.columns = ["Municipality", "Count"]
+            fig_bar = px.bar(muncity_counts, x="Municipality", y="Count", title="Total Cases per Municipality", text_auto=True)
+            fig_bar.update_traces(marker_color='#2563eb')
+            fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, height=500)
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+        if "AgeYears" in filtered_df.columns and "Sex" in filtered_df.columns:
+            fig_hist = px.histogram(filtered_df, x="AgeYears", nbins=25, title="Age and Sex Distribution of Cases", color="Sex", barmode="group", color_discrete_sequence=["#2563eb", "#ec4899"])
+            fig_hist.update_layout(height=500)
+            st.plotly_chart(fig_hist, use_container_width=True)
+        
+    with tab3:
+        if "ClinClass" in filtered_df.columns:
+            class_counts = filtered_df["ClinClass"].value_counts().reset_index()
+            class_counts.columns = ["Classification", "Count"]
+            color_map = {"NO WARNING SIGNS": "#10b981", "WITH WARNING SIGNS": "#f59e0b", "SEVERE DENGUE": "#ef4444"}
+            fig_pie = px.pie(class_counts, names="Classification", values="Count", hole=0.45, title="Clinical Severity Classification", color="Classification", color_discrete_map=color_map)
+            fig_pie.update_layout(height=500)
+            st.plotly_chart(fig_pie, use_container_width=True)
+
+        if 'DRU' in filtered_df.columns:
+            dru_counts = filtered_df["DRU"].fillna("Unspecified").value_counts().reset_index()
+            dru_counts.columns = ["Facility Type", "Count"]
+            fig_dru = px.bar(dru_counts, x="Facility Type", y="Count", text_auto=True, title="Cases by Disease Reporting Unit (DRU) Type")
+            fig_dru.update_traces(marker_color='#6366f1')
+            fig_dru.update_layout(height=450)
+            st.plotly_chart(fig_dru, use_container_width=True)
+
+    with tab4:
+        map_style_choice = st.radio("Select Map Theme:", ["Light", "Street", "Satellite", "Dark"], horizontal=True)
+        
+        style_map = {
+            "Light": "carto-positron",
+            "Street": "open-street-map",
+            "Dark": "carto-darkmatter",
+            "Satellite": "white-bg" 
+        }
+        label_color = 'white' if map_style_choice in ["Dark", "Satellite"] else 'black'
+
+        if muncity_input != "All Municipalities":
+            st.subheader(f"Geographic Heatmap: Barangays in {muncity_input}")
+            brgy_geojson, err = fetch_barangay_geojson(muncity_input)
             
-            base_df = pd.DataFrame({"Join_Key": all_geojson_brgys, "Barangay_Display": all_geojson_originals, "Base_Cases": 0})
-            curr_cases = filtered_df.groupby("Barangay").size().reset_index(name="Filtered_Cases")
-            curr_cases["Join_Key"] = curr_cases["Barangay"].apply(clean_brgy_name)
-            curr_cases = curr_cases.groupby("Join_Key")["Filtered_Cases"].sum().reset_index()
-            
-            map_data = pd.merge(base_df, curr_cases, on="Join_Key", how="left")
+            if brgy_geojson and "Barangay" in filtered_df.columns:
+                all_geojson_brgys = [f['properties']['Standard_Name'] for f in brgy_geojson['features']]
+                all_geojson_originals = [f['properties']['Original_Name'] for f in brgy_geojson['features']]
+                
+                base_df = pd.DataFrame({"Join_Key": all_geojson_brgys, "Barangay_Display": all_geojson_originals, "Base_Cases": 0})
+                curr_cases = filtered_df.groupby("Barangay").size().reset_index(name="Filtered_Cases")
+                curr_cases["Join_Key"] = curr_cases["Barangay"].apply(clean_brgy_name)
+                curr_cases = curr_cases.groupby("Join_Key")["Filtered_Cases"].sum().reset_index()
+                
+                map_data = pd.merge(base_df, curr_cases, on="Join_Key", how="left")
+                map_data["Total Cases"] = map_data["Filtered_Cases"].fillna(0).astype(int)
+                
+                lons, lats, texts = [], [], []
+                for feat in brgy_geojson['features']:
+                    std_name = feat['properties']['Standard_Name']
+                    display_name = feat['properties'].get('Original_Name', std_name)
+                    match = map_data[map_data['Join_Key'] == std_name]
+                    cases = match['Total Cases'].values[0] if not match.empty else 0
+                    lon, lat = get_polygon_centroid(feat['geometry'])
+                    if lon is not None and lat is not None:
+                        lons.append(lon); lats.append(lat)
+                        texts.append(f"{display_name.title()}<br>{int(cases)}")
+                
+                cam_lat = np.mean(lats) if lats else 17.58
+                cam_lon = np.mean(lons) if lons else 120.83
+                
+                fig_map = px.choropleth_mapbox(
+                    map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
+                    color='Total Cases', hover_name='Barangay_Display', color_continuous_scale="Reds",
+                    mapbox_style=style_map[map_style_choice], zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.85
+                )
+                
+                if map_style_choice == "Satellite":
+                    fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
+                
+                fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
+                fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
+                st.plotly_chart(fig_map, use_container_width=True)
+            else:
+                st.error(err if err else "Barangay column missing in data.")
+                
+        else:
+            st.subheader("Geographic Heatmap: Municipalities in Abra")
+            base_df = pd.DataFrame({"Muncity": ALL_ABRA_MUNICIPALITIES, "Base_Cases": 0})
+            curr_cases = filtered_df.groupby("Muncity").size().reset_index(name="Filtered_Cases")
+            map_data = pd.merge(base_df, curr_cases, on="Muncity", how="left")
             map_data["Total Cases"] = map_data["Filtered_Cases"].fillna(0).astype(int)
             
-            lons, lats, texts = [], [], []
-            for feat in brgy_geojson['features']:
-                std_name = feat['properties']['Standard_Name']
-                display_name = feat['properties'].get('Original_Name', std_name)
-                match = map_data[map_data['Join_Key'] == std_name]
-                cases = match['Total Cases'].values[0] if not match.empty else 0
-                lon, lat = get_polygon_centroid(feat['geometry'])
-                if lon is not None and lat is not None:
-                    lons.append(lon); lats.append(lat)
-                    # USING <br> FOR TWO ROWS
-                    texts.append(f"{display_name.title()}<br>{int(cases)}")
-            
-            cam_lat = np.mean(lats) if lats else 17.58
-            cam_lon = np.mean(lons) if lons else 120.83
-            
-            fig_map = px.choropleth_mapbox(
-                map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
-                color='Total Cases', hover_name='Barangay_Display', color_continuous_scale="Reds",
-                mapbox_style=style_map[map_style_choice], zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.85
-            )
-            
-            if map_style_choice == "Satellite":
-                fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
-            
-            fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
-            fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
-            st.plotly_chart(fig_map, use_container_width=True)
+            abra_geojson = fetch_muncity_geojson()
+            if abra_geojson:
+                lons, lats, texts = [], [], []
+                for feat in abra_geojson['features']:
+                    std_name = feat['properties']['Standard_Name']
+                    match = map_data[map_data['Muncity'] == std_name]
+                    cases = match['Total Cases'].values[0] if not match.empty else 0
+                    lon, lat = get_polygon_centroid(feat['geometry'])
+                    if lon is not None and lat is not None:
+                        lons.append(lon); lats.append(lat)
+                        texts.append(f"{std_name.title()}<br>{int(cases)}")
+                        
+                fig_map = px.choropleth_mapbox(
+                    map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
+                    color='Total Cases', hover_name='Muncity', color_continuous_scale="Reds",
+                    mapbox_style=style_map[map_style_choice], zoom=8.8, center={"lat": 17.58, "lon": 120.83}, opacity=0.85
+                )
+                
+                if map_style_choice == "Satellite":
+                    fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
+
+                fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
+                fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
+                st.plotly_chart(fig_map, use_container_width=True)
+            else:
+                st.error("Could not fetch the Abra geographic boundaries.")
+
+    with tab5:
+        st.subheader("Surveillance Line List")
+        display_cols = ["PatientNumber", "FullName", "Muncity", "AgeYears", "Sex", "DOnset", "DAdmit", "DRU", "ClinClass", "Outcome"]
+        available_cols = [col for col in display_cols if col in filtered_df.columns]
+        st.dataframe(filtered_df[available_cols].sort_values("DOnset", ascending=False), use_container_width=True, hide_index=True, height=600)
+
+# ==========================================
+# MAIN ROUTING LOGIC
+# ==========================================
+
+def main():
+    if not st.session_state.logged_in:
+        if st.session_state.current_page == 'register':
+            render_register()
         else:
-            st.error(err if err else "Barangay column missing in data.")
-            
+            render_login()
     else:
-        st.subheader("Geographic Heatmap: Municipalities in Abra")
-        base_df = pd.DataFrame({"Muncity": ALL_ABRA_MUNICIPALITIES, "Base_Cases": 0})
-        curr_cases = filtered_df.groupby("Muncity").size().reset_index(name="Filtered_Cases")
-        map_data = pd.merge(base_df, curr_cases, on="Muncity", how="left")
-        map_data["Total Cases"] = map_data["Filtered_Cases"].fillna(0).astype(int)
-        
-        abra_geojson = fetch_muncity_geojson()
-        if abra_geojson:
-            lons, lats, texts = [], [], []
-            for feat in abra_geojson['features']:
-                std_name = feat['properties']['Standard_Name']
-                match = map_data[map_data['Muncity'] == std_name]
-                cases = match['Total Cases'].values[0] if not match.empty else 0
-                lon, lat = get_polygon_centroid(feat['geometry'])
-                if lon is not None and lat is not None:
-                    lons.append(lon); lats.append(lat)
-                    # USING <br> FOR TWO ROWS
-                    texts.append(f"{std_name.title()}<br>{int(cases)}")
-                    
-            fig_map = px.choropleth_mapbox(
-                map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
-                color='Total Cases', hover_name='Muncity', color_continuous_scale="Reds",
-                mapbox_style=style_map[map_style_choice], zoom=8.8, center={"lat": 17.58, "lon": 120.83}, opacity=0.85
-            )
+        # App-wide Top Navigation Bar
+        col_title, col_admin, col_settings, col_logout = st.columns([6, 1, 1, 1])
+        with col_title:
+            st.markdown(f"**Welcome, {st.session_state.username}** | Role: {st.session_state.role.title()}")
+        with col_admin:
+            if st.session_state.role == 'admin':
+                if st.button("Admin Panel", use_container_width=True): navigate('admin')
+        with col_settings:
+            if st.button("Settings", use_container_width=True): navigate('settings')
+        with col_logout:
+            if st.button("Logout", use_container_width=True): logout()
             
-            if map_style_choice == "Satellite":
-                fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
+        st.markdown("---")
 
-            fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
-            fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
-            st.plotly_chart(fig_map, use_container_width=True)
+        # Routing the content below the navigation bar
+        if st.session_state.current_page == 'admin' and st.session_state.role == 'admin':
+            if st.button("← Back to Menu", use_container_width=True): navigate('main_menu')
+            render_admin_panel()
+        elif st.session_state.current_page == 'settings':
+            if st.button("← Back to Menu", use_container_width=True): navigate('main_menu')
+            render_settings()
         else:
-            st.error("Could not fetch the Abra geographic boundaries.")
+            # Main Application Area
+            if st.session_state.active_program == 'dengue':
+                render_dengue()
+            else:
+                render_main_menu()
 
-with tab5:
-    st.subheader("Surveillance Line List")
-    display_cols = ["PatientNumber", "FullName", "Muncity", "AgeYears", "Sex", "DOnset", "DAdmit", "DRU", "ClinClass", "Outcome"]
-    available_cols = [col for col in display_cols if col in filtered_df.columns]
-    st.dataframe(filtered_df[available_cols].sort_values("DOnset", ascending=False), use_container_width=True, hide_index=True, height=600)
+if __name__ == "__main__":
+    main()
