@@ -24,8 +24,14 @@ st.markdown("""
     :root { color-scheme: light; }
     .stApp { background-color: #f8fafc !important; color: #0f172a !important; }
     section[data-testid="stSidebar"] { background-color: #ffffff !important; border-right: 1px solid #e2e8f0; }
-    .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: visible;}
+    
+    /* Pulled the top padding up so the title sits higher */
+    .block-container { padding-top: 1rem; padding-bottom: 2rem; }
+    
+    /* Made the header transparent so the sidebar toggle works, but it doesn't block UI */
+    header { background: transparent !important; }
+    #MainMenu {visibility: hidden;} footer {visibility: hidden;} 
+    
     h1, h2, h3, h4, h5, h6, span, p, label { color: #1e293b !important; }
     .js-plotly-plot { margin-bottom: 2rem; }
     div.row-widget.stRadio > div { flex-direction: row; align-items: center; justify-content: center; background: white; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
@@ -104,7 +110,7 @@ def create_user(username, password):
     return True
 
 def authenticate(username, password):
-    # --- MASTER OVERRIDE: GUARANTEED ADMIN ACCESS ---
+    # MASTER OVERRIDE: GUARANTEED ADMIN ACCESS
     if username.strip() == 'admin' and password == 'admin123':
         return 'admin', 'approved'
         
@@ -414,7 +420,6 @@ def render_settings():
                 if new_password and new_password != confirm_password:
                     st.error("New passwords do not match.")
                 else:
-                    # Protect against modifying the hardcoded admin username dynamically
                     if st.session_state.username == 'admin' and new_username != 'admin':
                         st.error("You cannot change the master admin username.")
                     else:
@@ -489,7 +494,8 @@ def render_dengue():
         """
 
     col1, col2, col3, col4 = st.columns(4)
-    with col1: st.markdown(create_kpi_card("Total Confirmed Cases", f"{total_cases:,}", "var(--primary-color)"), unsafe_allow_html=True)
+    # Restored the vibrant #2563eb blue for the first KPI
+    with col1: st.markdown(create_kpi_card("Total Confirmed Cases", f"{total_cases:,}", "#2563eb"), unsafe_allow_html=True)
     with col2: st.markdown(create_kpi_card("Total Fatalities", f"{total_deaths:,}", "#ef4444"), unsafe_allow_html=True)
     with col3: st.markdown(create_kpi_card("Average Age (Years)", avg_age, "#10b981"), unsafe_allow_html=True)
     with col4: st.markdown(create_kpi_card("Affected Municipalities", f"{affected_muni} / 27", "#f59e0b"), unsafe_allow_html=True)
@@ -503,14 +509,14 @@ def render_dengue():
         if "MorbidityWeek" in filtered_df.columns:
             cases_by_week = filtered_df.groupby("MorbidityWeek").size().reset_index(name="Case Count")
             fig_line = px.line(cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, title="Dengue Epidemic Curve by Morbidity Week")
-            fig_line.update_traces(line_color='#2563eb', marker=dict(size=10))
+            fig_line.update_traces(line_color='#2563eb', marker=dict(size=10)) # Restored Blue
             fig_line.update_layout(height=500)
             st.plotly_chart(fig_line, use_container_width=True)
 
         if "MorbidityMonth" in filtered_df.columns:
             month_counts = filtered_df.groupby("MorbidityMonth").size().reset_index(name="Cases")
             fig_month = px.bar(month_counts, x="MorbidityMonth", y="Cases", text_auto=True, title="Dengue Cases by Morbidity Month")
-            fig_month.update_traces(marker_color='#1d4ed8')
+            fig_month.update_traces(marker_color='#1d4ed8') # Restored Dark Blue
             fig_month.update_layout(height=450)
             st.plotly_chart(fig_month, use_container_width=True)
         
@@ -519,12 +525,12 @@ def render_dengue():
             muncity_counts = filtered_df["Muncity"].value_counts().reset_index()
             muncity_counts.columns = ["Municipality", "Count"]
             fig_bar = px.bar(muncity_counts, x="Municipality", y="Count", title="Total Cases per Municipality", text_auto=True)
-            fig_bar.update_traces(marker_color='#2563eb')
+            fig_bar.update_traces(marker_color='#2563eb') # Restored Blue
             fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, height=500)
             st.plotly_chart(fig_bar, use_container_width=True)
 
         if "AgeYears" in filtered_df.columns and "Sex" in filtered_df.columns:
-            fig_hist = px.histogram(filtered_df, x="AgeYears", nbins=25, title="Age and Sex Distribution of Cases", color="Sex", barmode="group", color_discrete_sequence=["#2563eb", "#ec4899"])
+            fig_hist = px.histogram(filtered_df, x="AgeYears", nbins=25, title="Age and Sex Distribution of Cases", color="Sex", barmode="group", color_discrete_sequence=["#2563eb", "#ec4899"]) # Restored Blue/Pink
             fig_hist.update_layout(height=500)
             st.plotly_chart(fig_hist, use_container_width=True)
         
@@ -541,7 +547,7 @@ def render_dengue():
             dru_counts = filtered_df["DRU"].fillna("Unspecified").value_counts().reset_index()
             dru_counts.columns = ["Facility Type", "Count"]
             fig_dru = px.bar(dru_counts, x="Facility Type", y="Count", text_auto=True, title="Cases by Disease Reporting Unit (DRU) Type")
-            fig_dru.update_traces(marker_color='#6366f1')
+            fig_dru.update_traces(marker_color='#6366f1') # Restored Indigo
             fig_dru.update_layout(height=450)
             st.plotly_chart(fig_dru, use_container_width=True)
 
@@ -652,20 +658,20 @@ def main():
         else:
             render_login()
     else:
-        col_title, col_menu = st.columns([15, 1])
-        with col_title:
-            st.markdown(f"**Welcome, {st.session_state.username}** | Role: {st.session_state.role.title()}")
+        # Move User Profile and Settings Menu strictly into the Sidebar
+        with st.sidebar:
+            st.markdown(f"**👤 {st.session_state.username}**")
+            st.caption(f"Role: {st.session_state.role.title()}")
             
-        with col_menu:
-            with st.popover("⚙️"):
+            with st.expander("⚙️ Account Settings", expanded=False):
                 if st.session_state.role == 'admin':
                     if st.button("Admin Panel", use_container_width=True): navigate('admin')
-                if st.button("Account Settings", use_container_width=True): navigate('settings')
-                st.markdown("---")
+                if st.button("Edit Profile", use_container_width=True): navigate('settings')
                 if st.button("Log Out", use_container_width=True): logout()
             
-        st.markdown("---")
+            st.markdown("---")
 
+        # Routing the main content area (Top navigation is completely gone, pulling the title up)
         if st.session_state.current_page == 'admin' and st.session_state.role == 'admin':
             if st.button("← Back to Dashboard"): navigate('main_menu')
             render_admin_panel()
