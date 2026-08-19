@@ -459,14 +459,6 @@ def render_main_menu():
             pass
 
 def render_dengue():
-    st.markdown(f"""
-        <div style="text-align: center; padding: 10px 0px 15px 0px;">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/1/1a/Abra_provincial_seal.png" width="90" style="margin-bottom: 15px; filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.1));">
-            <span style="background-color: rgba(128,128,128,0.15); border: 1px solid rgba(128,128,128,0.3); color: inherit; padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.5px;">
-                📍 {st.session_state['user_territory'].upper()}
-            </span>
-        </div>
-        """, unsafe_allow_html=True)
     with st.sidebar:
         if st.button("Back to Menu", use_container_width=True):
             st.session_state.active_program = None
