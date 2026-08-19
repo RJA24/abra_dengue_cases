@@ -437,7 +437,7 @@ def render_main_menu():
 
 def render_dengue():
     with st.sidebar:
-        if st.button("← Back to Menu", use_container_width=True):
+        if st.button("Back to Menu", use_container_width=True):
             st.session_state.active_program = None
             st.rerun()
             
@@ -446,8 +446,7 @@ def render_dengue():
         
         df = load_data()
         
-        # Secured the filters back into an expander cleanly
-        with st.expander("Filter Options", expanded=False):
+        with st.expander("Filter Options", expanded=True):
             muni_options = ["All Municipalities"] + sorted(df["Muncity"].dropna().unique().tolist())
             muncity_input = st.selectbox("Select Municipality:", options=muni_options, index=0)
             sex_input = st.multiselect("Select Sex:", options=df["Sex"].dropna().unique(), default=[])
@@ -472,8 +471,9 @@ def render_dengue():
     affected_muni = filtered_df["Muncity"].nunique()
 
     def create_kpi_card(title, value, border_color):
+        # Using explicit independent border properties to securely bypass the HTML sanitizer.
         return f"""
-        <div style="background-color: #ffffff; padding: 22px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; border-left: 8px solid {border_color} !important; text-align: center;">
+        <div style="background-color: #ffffff; padding: 22px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; border-left: 8px solid {border_color}; text-align: center;">
             <p style="margin: 0; font-size: 1rem; color: #64748b; font-weight: 600; text-transform: uppercase;">{title}</p>
             <h2 style="margin: 10px 0 0 0; font-size: 2.6rem; color: #0f172a; font-weight: 800;">{value}</h2>
         </div>
@@ -494,14 +494,14 @@ def render_dengue():
         if "MorbidityWeek" in filtered_df.columns:
             cases_by_week = filtered_df.groupby("MorbidityWeek").size().reset_index(name="Case Count")
             fig_line = px.line(cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, title="Dengue Epidemic Curve by Morbidity Week")
-            fig_line.update_traces(line_color="#eb9c25", marker=dict(size=10))
+            fig_line.update_traces(line_color="#eb9525", marker=dict(size=10))
             fig_line.update_layout(height=500)
             st.plotly_chart(fig_line, use_container_width=True)
 
         if "MorbidityMonth" in filtered_df.columns:
             month_counts = filtered_df.groupby("MorbidityMonth").size().reset_index(name="Cases")
             fig_month = px.bar(month_counts, x="MorbidityMonth", y="Cases", text_auto=True, title="Dengue Cases by Morbidity Month")
-            fig_month.update_traces(marker_color="#d81d1d")
+            fig_month.update_traces(marker_color="#d8291d")
             fig_month.update_layout(height=450)
             st.plotly_chart(fig_month, use_container_width=True)
         
@@ -510,7 +510,7 @@ def render_dengue():
             muncity_counts = filtered_df["Muncity"].value_counts().reset_index()
             muncity_counts.columns = ["Municipality", "Count"]
             fig_bar = px.bar(muncity_counts, x="Municipality", y="Count", title="Total Cases per Municipality", text_auto=True)
-            fig_bar.update_traces(marker_color="#eb2525")
+            fig_bar.update_traces(marker_color="#c325eb")
             fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, height=500)
             st.plotly_chart(fig_bar, use_container_width=True)
 
@@ -532,7 +532,7 @@ def render_dengue():
             dru_counts = filtered_df["DRU"].fillna("Unspecified").value_counts().reset_index()
             dru_counts.columns = ["Facility Type", "Count"]
             fig_dru = px.bar(dru_counts, x="Facility Type", y="Count", text_auto=True, title="Cases by Disease Reporting Unit (DRU) Type")
-            fig_dru.update_traces(marker_color='#6366f1')
+            fig_dru.update_traces(marker_color="#6366f1")
             fig_dru.update_layout(height=450)
             st.plotly_chart(fig_dru, use_container_width=True)
 
