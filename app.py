@@ -72,11 +72,9 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/1IHdlNfzNtBAOk3LlDN2LstxlRmo
 
 def get_users_df():
     conn = st.connection("gsheets", type=GSheetsConnection)
-    # ttl=0 completely disables caching so it ALWAYS reads the live sheet when logging in
     df = conn.read(spreadsheet=SHEET_URL, worksheet="Users", usecols=[0, 1, 2, 3], ttl=0)
     df = df.dropna(subset=['username'])
     
-    # STRIP hidden spaces and force everything to string to prevent Google Sheets formatting errors
     df['username'] = df['username'].astype(str).str.strip()
     df['password'] = df['password'].astype(str).str.strip()
     df['role'] = df['role'].astype(str).str.strip()
@@ -106,6 +104,10 @@ def create_user(username, password):
     return True
 
 def authenticate(username, password):
+    # --- MASTER OVERRIDE: GUARANTEED ADMIN ACCESS ---
+    if username.strip() == 'admin' and password == 'admin123':
+        return 'admin', 'approved'
+        
     df = get_users_df()
     user_row = df[df['username'] == username.strip()]
     if not user_row.empty:
@@ -412,12 +414,16 @@ def render_settings():
                 if new_password and new_password != confirm_password:
                     st.error("New passwords do not match.")
                 else:
-                    success = update_credentials(st.session_state.username, new_username, new_password)
-                    if success:
-                        st.success("Credentials updated! Please log in again.")
-                        logout()
+                    # Protect against modifying the hardcoded admin username dynamically
+                    if st.session_state.username == 'admin' and new_username != 'admin':
+                        st.error("You cannot change the master admin username.")
                     else:
-                        st.error("Username already taken.")
+                        success = update_credentials(st.session_state.username, new_username, new_password)
+                        if success:
+                            st.success("Credentials updated! Please log in again.")
+                            logout()
+                        else:
+                            st.error("Username already taken.")
 
 def render_main_menu():
     st.markdown("<h1 style='text-align: center; font-size: 3rem; margin-bottom: 50px;'>Provincial Epidemiology and Surveillance Unit</h1>", unsafe_allow_html=True)
