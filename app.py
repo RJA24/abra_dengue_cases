@@ -11,7 +11,7 @@ import os
 
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="Abra PESU | Dengue Surveillance", 
+    page_title="Abra PESU | Dengue Surveillance", page_icon="https://github.com/RJA24/abra_sia_2026/blob/main/PHO%20logo.png?raw=true", 
     layout="wide", 
     initial_sidebar_state="expanded"
 )
