@@ -19,6 +19,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Inject FontAwesome Library
 st.markdown("""
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 """, unsafe_allow_html=True)
@@ -399,7 +400,7 @@ def render_register():
             navigate('login')
 
 def render_admin_panel():
-    st.title("Admin Control Panel")
+    st.markdown("### <i class='fa-solid fa-screwdriver-wrench' style='color: #475569;'></i> Admin Control Panel", unsafe_allow_html=True)
     st.caption("Manage user access and edit roles.")
     
     try:
@@ -453,7 +454,7 @@ def render_admin_panel():
         st.error("Could not load users. Please check your Google Service Account configuration.")
 
 def render_settings():
-    st.title("Account Settings")
+    st.markdown("### <i class='fa-solid fa-gear' style='color: #475569;'></i> Account Settings", unsafe_allow_html=True)
     col1, col2 = st.columns([1, 1])
     with col1:
         with st.form("settings_form"):
@@ -518,12 +519,13 @@ def render_main_menu():
 
 def render_dengue():
     with st.sidebar:
+        # Replaced Emoji with FontAwesome Shortcode Equivalent
         if st.button("⬅️ Back to Menu", use_container_width=True):
             st.session_state.active_program = None
             st.rerun()
             
         st.markdown("<hr style='margin: 15px 0; border: none; border-bottom: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
-        st.markdown("<h4 style='color: #0f172a; margin: 0 0 15px 0;'>📊 Filters</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #0f172a; margin: 0 0 15px 0;'><i class='fa-solid fa-arrow-down-short-wide' style='color: #475569;'></i> Filters</h4>", unsafe_allow_html=True)
         
         df = load_data()
         
@@ -533,6 +535,7 @@ def render_dengue():
         clin_input = st.multiselect("Clinical Class", options=df["ClinClass"].dropna().unique(), default=[])
             
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+        # Replaced Emoji with FontAwesome Shortcode Equivalent
         if st.button("🔄 Refresh Data", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
@@ -740,8 +743,9 @@ def main():
             </div>
             """, unsafe_allow_html=True)
             
+            # Replaced Emoji with FontAwesome Shortcode Equivalent
             if st.session_state.role == 'admin':
-                if st.button("🛡️ Admin Panel", use_container_width=True): navigate('admin')
+                if st.button("🛠️ Admin Panel", use_container_width=True): navigate('admin')
             if st.button("⚙️ Profile & Settings", use_container_width=True): navigate('settings')
             if st.button("🚪 Sign out", use_container_width=True): logout()
 
