@@ -343,7 +343,7 @@ def fetch_barangay_geojson(target_muni):
 # ==========================================
 
 def render_login():
-    st.markdown("<h2 style='text-align: center;'>Provincial Epidemiology and Surveillance Unit</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center;'>Abra Provincial Epidemiology and Surveillance Unit</h2>", unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 1, 1])
