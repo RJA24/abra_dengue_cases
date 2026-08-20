@@ -706,7 +706,7 @@ def main():
             
             # Centered profile block 
             st.markdown(f"""
-            <div style="text-align: left; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px;">
+            <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px;">
                 <div style="font-size: 60px; line-height: 1;">👤</div>
                 <h3 style="margin: 10px 0 0 0; color: #0f172a;">{st.session_state.username}</h3>
                 <p style="margin: 0; color: #64748b; font-size: 14px;">{st.session_state.role.title()}</p>
