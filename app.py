@@ -519,8 +519,7 @@ def render_main_menu():
 
 def render_dengue():
     with st.sidebar:
-        # Replaced Emoji with FontAwesome Shortcode Equivalent
-        if st.button("⬅️ Back to Menu", use_container_width=True):
+        if st.button("Back to Menu", icon=":material/arrow_back:", use_container_width=True):
             st.session_state.active_program = None
             st.rerun()
             
@@ -536,7 +535,7 @@ def render_dengue():
             
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
         # Replaced Emoji with FontAwesome Shortcode Equivalent
-        if st.button("🔄 Refresh Data", use_container_width=True):
+        if st.button("Refresh Data", icon=":material/refresh:", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
@@ -745,16 +744,16 @@ def main():
             
             # Replaced Emoji with FontAwesome Shortcode Equivalent
             if st.session_state.role == 'admin':
-                if st.button("🛠️ Admin Panel", use_container_width=True): navigate('admin')
-            if st.button("⚙️ Profile & Settings", use_container_width=True): navigate('settings')
-            if st.button("🚪 Sign out", use_container_width=True): logout()
+                if st.button("Admin Panel", icon=":material/build:", use_container_width=True): navigate('admin')
+            if st.button("Profile & Settings", icon=":material/settings:", use_container_width=True): navigate('settings')
+            if st.button("Sign out", icon=":material/logout:", use_container_width=True): logout()
 
         # --- Routing Logic ---
         if st.session_state.current_page == 'admin' and st.session_state.role == 'admin':
-            if st.button("⬅️ Back to Menu"): navigate('main_menu')
+            if st.button("Back to Menu", icon=":material/arrow_back:"): navigate('main_menu')
             render_admin_panel()
         elif st.session_state.current_page == 'settings':
-            if st.button("⬅️ Back to Menu"): navigate('main_menu')
+            if st.button("Back to Menu", icon=":material/arrow_back:"): navigate('main_menu')
             render_settings()
         else:
             if st.session_state.active_program == 'dengue':
