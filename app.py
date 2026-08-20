@@ -54,21 +54,31 @@ st.markdown("""
         background-color: transparent !important;
         border: none !important;
         box-shadow: none !important;
-        justify-content: flex-start !important; /* Left-align the text */
         color: #334155 !important;
         font-weight: 500 !important;
-        padding: 8px 16px !important;
+        padding: 10px 16px !important;
         border-radius: 8px !important;
         transition: all 0.2s ease !important;
+        width: 100% !important;
+    }
+    
+    /* This completely forces the inner nested text to the left */
+    section[data-testid="stSidebar"] .stButton > button div[data-testid="stMarkdownContainer"] {
+        display: flex !important;
+        justify-content: flex-start !important;
+        text-align: left !important;
+        width: 100% !important;
+    }
+    
+    section[data-testid="stSidebar"] .stButton > button p {
+        font-size: 16px !important;
+        text-align: left !important;
+        margin: 0 !important;
     }
     
     section[data-testid="stSidebar"] .stButton > button:hover {
         background-color: #f1f5f9 !important; /* Subtle hover effect */
         color: #0f172a !important;
-    }
-    
-    section[data-testid="stSidebar"] .stButton > button p {
-        font-size: 16px !important;
     }
     /* ---------------------------------------------------- */
 
@@ -81,10 +91,16 @@ st.markdown("""
         transition: all 0.2s ease-in-out !important;
         justify-content: center !important; /* Ensure main menu buttons stay centered */
     }
+    /* Ensure the big buttons STAY centered even with the new sidebar rules */
+    div.element-container:has(.big-btn-marker) + div.element-container button div[data-testid="stMarkdownContainer"] {
+        justify-content: center !important;
+        text-align: center !important;
+    }
     div.element-container:has(.big-btn-marker) + div.element-container button p {
         font-size: 24px !important;
         font-weight: 600 !important;
         color: #0f172a !important;
+        text-align: center !important;
     }
     div.element-container:has(.big-btn-marker) + div.element-container button:hover {
         border-color: #2563eb !important;
@@ -506,7 +522,7 @@ def render_dengue():
         
         df = load_data()
         
-        with st.expander("Filter Options", expanded=False):
+        with st.expander("Filter Options", expanded=True):
             muni_options = ["All Municipalities"] + sorted(df["Muncity"].dropna().unique().tolist())
             muncity_input = st.selectbox("Select Municipality:", options=muni_options, index=0)
             sex_input = st.multiselect("Select Sex:", options=df["Sex"].dropna().unique(), default=[])
