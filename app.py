@@ -585,7 +585,7 @@ def render_dengue():
             muncity_counts = filtered_df["Muncity"].value_counts().reset_index()
             muncity_counts.columns = ["Municipality", "Count"]
             fig_bar = px.bar(muncity_counts, x="Municipality", y="Count", title="Total Cases per Municipality", text_auto=True)
-            fig_bar.update_traces(marker_color='#2563eb')
+            fig_bar.update_traces(marker_color="#eb2525")
             fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, height=500)
             st.plotly_chart(fig_bar, use_container_width=True)
 
