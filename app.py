@@ -14,6 +14,7 @@ from streamlit_gsheets import GSheetsConnection
 # --- Page Configuration ---
 st.set_page_config(
     page_title="Abra PESU Portal", 
+    page_icon="https://github.com/RJA24/abra_sia_2026/blob/main/PHO%20logo.png?raw=true", 
     layout="wide", 
     initial_sidebar_state="expanded"
 )
@@ -568,14 +569,14 @@ def render_dengue():
         if "MorbidityWeek" in filtered_df.columns:
             cases_by_week = filtered_df.groupby("MorbidityWeek").size().reset_index(name="Case Count")
             fig_line = px.line(cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, title="Dengue Epidemic Curve by Morbidity Week")
-            fig_line.update_traces(line_color="#eba925", marker=dict(size=10))
+            fig_line.update_traces(line_color='#2563eb', marker=dict(size=10))
             fig_line.update_layout(height=500)
             st.plotly_chart(fig_line, use_container_width=True)
 
         if "MorbidityMonth" in filtered_df.columns:
             month_counts = filtered_df.groupby("MorbidityMonth").size().reset_index(name="Cases")
             fig_month = px.bar(month_counts, x="MorbidityMonth", y="Cases", text_auto=True, title="Dengue Cases by Morbidity Month")
-            fig_month.update_traces(marker_color="#b300cf")
+            fig_month.update_traces(marker_color='#1d4ed8')
             fig_month.update_layout(height=450)
             st.plotly_chart(fig_month, use_container_width=True)
         
@@ -717,14 +718,19 @@ def main():
         else:
             render_login()
     else:
+        # Determine which profile image to show based on context
+        if st.session_state.active_program == 'dengue':
+            profile_img_url = "https://github.com/RJA24/abra_dengue_cases/blob/main/dengue.png?raw=true"
+        else:
+            profile_img_url = "https://github.com/RJA24/abra_sia_2026/blob/main/PHO%20logo.png?raw=true"
+
         # --- Clean, professional sidebar matching the Upwork/Coinbase styling ---
         with st.sidebar:
             
-            # Centered profile block utilizing your custom dengue.png image
-            # Note: ?raw=true is appended to force GitHub to serve the raw image file
+            # Centered profile block utilizing dynamic image
             st.markdown(f"""
             <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0; margin-bottom: 15px;">
-                <img src="https://github.com/RJA24/abra_dengue_cases/blob/main/dengue.png?raw=true" style="width: 80px; height: 80px; border-radius: 50%; object-fit: contain; margin-bottom: 10px; background-color: #f8fafc; padding: 5px; border: 1px solid #e2e8f0;">
+                <img src="{profile_img_url}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: contain; margin-bottom: 10px; background-color: #f8fafc; padding: 5px; border: 1px solid #e2e8f0;">
                 <h3 style="margin: 0; color: #0f172a; font-size: 1.2rem;">{st.session_state.username}</h3>
                 <p style="margin: 0; color: #64748b; font-size: 0.9rem;">{st.session_state.role.title()}</p>
             </div>
