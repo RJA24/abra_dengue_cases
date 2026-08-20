@@ -492,7 +492,7 @@ def render_main_menu():
     st.markdown(bg_css, unsafe_allow_html=True)
     # ----------------------------------
 
-    st.markdown("<h1 style='text-align: center; font-size: 3rem; margin-bottom: 50px;'>Provincial Epidemiology and Surveillance Unit</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; font-size: 3rem; margin-bottom: 50px;'>Abra Provincial Epidemiology and Surveillance Unit</h1>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns(3, gap="large")
     
