@@ -14,7 +14,6 @@ from streamlit_gsheets import GSheetsConnection
 # --- Page Configuration ---
 st.set_page_config(
     page_title="Abra PESU Portal", 
-    page_icon="https://github.com/RJA24/abra_sia_2026/blob/main/PHO%20logo.png?raw=true",
     layout="wide", 
     initial_sidebar_state="expanded"
 )
@@ -33,6 +32,46 @@ st.markdown("""
     .js-plotly-plot { margin-bottom: 2rem; }
     div.row-widget.stRadio > div { flex-direction: row; align-items: center; justify-content: center; background: #ffffff; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
     
+    /* Global standard button cleanup */
+    .stButton > button, .stPopover > button {
+        color: #1e293b !important;
+        border-color: #cbd5e1 !important;
+        background-color: white !important;
+    }
+    .stButton > button:hover, .stPopover > button:hover,
+    .stButton > button:focus, .stPopover > button:focus,
+    .stButton > button:active, .stPopover > button:active {
+        border-color: #1e293b !important;
+        color: #1e293b !important;
+        background-color: #f1f5f9 !important;
+        box-shadow: none !important;
+    }
+
+    /* ---------------------------------------------------- */
+    /* SLEEK SIDEBAR NAVIGATION (Coinbase/Upwork Style)     */
+    /* ---------------------------------------------------- */
+    section[data-testid="stSidebar"] .stButton > button {
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        justify-content: flex-start !important; /* Left-align the text */
+        color: #334155 !important;
+        font-weight: 500 !important;
+        padding: 8px 16px !important;
+        border-radius: 8px !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    section[data-testid="stSidebar"] .stButton > button:hover {
+        background-color: #f1f5f9 !important; /* Subtle hover effect */
+        color: #0f172a !important;
+    }
+    
+    section[data-testid="stSidebar"] .stButton > button p {
+        font-size: 16px !important;
+    }
+    /* ---------------------------------------------------- */
+
     /* Giant Program Buttons styling */
     div.element-container:has(.big-btn-marker) + div.element-container button {
         height: 140px !important;
@@ -40,6 +79,7 @@ st.markdown("""
         border: 1px solid #cbd5e1 !important;
         background-color: #ffffff !important;
         transition: all 0.2s ease-in-out !important;
+        justify-content: center !important; /* Ensure main menu buttons stay centered */
     }
     div.element-container:has(.big-btn-marker) + div.element-container button p {
         font-size: 24px !important;
@@ -416,10 +456,7 @@ def render_settings():
                             st.error("Username already taken.")
 
 def render_main_menu():
-
-    # ---------------------------------------------------------
-    # 🎨 BACKGROUND IMAGE INJECTION
-    # ---------------------------------------------------------
+    # --- BACKGROUND IMAGE INJECTION ---
     bg_css = """
     <style>
     .stApp {
@@ -435,8 +472,8 @@ def render_main_menu():
     header[data-testid="stHeader"] { background: rgba(0,0,0,0) !important; }
     </style>
     """
-    st.markdown(bg_css, unsafe_allow_html=True) 
-    # ---------------------------------------------------------
+    st.markdown(bg_css, unsafe_allow_html=True)
+    # ----------------------------------
 
     st.markdown("<h1 style='text-align: center; font-size: 3rem; margin-bottom: 50px;'>Provincial Epidemiology and Surveillance Unit</h1>", unsafe_allow_html=True)
     
@@ -460,22 +497,21 @@ def render_main_menu():
 
 def render_dengue():
     with st.sidebar:
-        if st.button("Back to Menu", use_container_width=True):
+        if st.button("⬅️ Back to Menu", use_container_width=True):
             st.session_state.active_program = None
             st.rerun()
             
-        st.markdown("---")
-        st.markdown("### Surveillance Filters")
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("##### 📊 Surveillance Filters")
         
         df = load_data()
         
-        with st.expander("Filter Options", expanded=False):
+        with st.expander("Filter Options", expanded=True):
             muni_options = ["All Municipalities"] + sorted(df["Muncity"].dropna().unique().tolist())
             muncity_input = st.selectbox("Select Municipality:", options=muni_options, index=0)
             sex_input = st.multiselect("Select Sex:", options=df["Sex"].dropna().unique(), default=[])
             clin_input = st.multiselect("Clinical Classification:", options=df["ClinClass"].dropna().unique(), default=[])
             
-        st.markdown("---")
         if st.button("🔄 Refresh Data", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
@@ -494,7 +530,6 @@ def render_dengue():
     affected_muni = filtered_df["Muncity"].nunique()
 
     def create_kpi_card(title, value, border_color):
-        # Using explicit independent border properties to securely bypass the HTML sanitizer.
         return f"""
         <div style="background-color: #ffffff; padding: 22px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; border-left: 8px solid {border_color}; text-align: center;">
             <p style="margin: 0; font-size: 1rem; color: #64748b; font-weight: 600; text-transform: uppercase;">{title}</p>
@@ -517,14 +552,14 @@ def render_dengue():
         if "MorbidityWeek" in filtered_df.columns:
             cases_by_week = filtered_df.groupby("MorbidityWeek").size().reset_index(name="Case Count")
             fig_line = px.line(cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, title="Dengue Epidemic Curve by Morbidity Week")
-            fig_line.update_traces(line_color="#eb9525", marker=dict(size=10))
+            fig_line.update_traces(line_color='#2563eb', marker=dict(size=10))
             fig_line.update_layout(height=500)
             st.plotly_chart(fig_line, use_container_width=True)
 
         if "MorbidityMonth" in filtered_df.columns:
             month_counts = filtered_df.groupby("MorbidityMonth").size().reset_index(name="Cases")
             fig_month = px.bar(month_counts, x="MorbidityMonth", y="Cases", text_auto=True, title="Dengue Cases by Morbidity Month")
-            fig_month.update_traces(marker_color="#d8291d")
+            fig_month.update_traces(marker_color='#1d4ed8')
             fig_month.update_layout(height=450)
             st.plotly_chart(fig_month, use_container_width=True)
         
@@ -533,7 +568,7 @@ def render_dengue():
             muncity_counts = filtered_df["Muncity"].value_counts().reset_index()
             muncity_counts.columns = ["Municipality", "Count"]
             fig_bar = px.bar(muncity_counts, x="Municipality", y="Count", title="Total Cases per Municipality", text_auto=True)
-            fig_bar.update_traces(marker_color="#c325eb")
+            fig_bar.update_traces(marker_color='#2563eb')
             fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, height=500)
             st.plotly_chart(fig_bar, use_container_width=True)
 
@@ -555,7 +590,7 @@ def render_dengue():
             dru_counts = filtered_df["DRU"].fillna("Unspecified").value_counts().reset_index()
             dru_counts.columns = ["Facility Type", "Count"]
             fig_dru = px.bar(dru_counts, x="Facility Type", y="Count", text_auto=True, title="Cases by Disease Reporting Unit (DRU) Type")
-            fig_dru.update_traces(marker_color="#6366f1")
+            fig_dru.update_traces(marker_color='#6366f1')
             fig_dru.update_layout(height=450)
             st.plotly_chart(fig_dru, use_container_width=True)
 
@@ -666,26 +701,33 @@ def main():
         else:
             render_login()
     else:
-        # --- Clean, professional sidebar matching the TOML ---
+        # --- Clean, professional sidebar matching the Upwork/Coinbase styling ---
         with st.sidebar:
-            st.markdown(f"### 👤 {st.session_state.username}")
-            st.caption(f"Role: {st.session_state.role.title()}")
-            st.markdown("<br>", unsafe_allow_html=True)
-
-            with st.expander("Settings", expanded=False):
-                if st.session_state.role == 'admin':
-                    if st.button("Admin Panel", use_container_width=True): navigate('admin')
-                if st.button("Account Settings", use_container_width=True): navigate('settings')
-                if st.button("Log Out", use_container_width=True): logout()
             
-            st.divider()
+            # Centered profile block 
+            st.markdown(f"""
+            <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px;">
+                <div style="font-size: 60px; line-height: 1;">👤</div>
+                <h3 style="margin: 10px 0 0 0; color: #0f172a;">{st.session_state.username}</h3>
+                <p style="margin: 0; color: #64748b; font-size: 14px;">{st.session_state.role.title()}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Borderless list items with icons
+            if st.session_state.role == 'admin':
+                if st.button("🛡️ Admin Panel", use_container_width=True): navigate('admin')
+            if st.button("⚙️ Profile & Settings", use_container_width=True): navigate('settings')
+            
+            # Add some spacing before the logout button
+            st.markdown("<br><br>", unsafe_allow_html=True)
+            if st.button("🚪 Sign out", use_container_width=True): logout()
 
         # --- Routing Logic ---
         if st.session_state.current_page == 'admin' and st.session_state.role == 'admin':
-            if st.button("Back to Menu"): navigate('main_menu')
+            if st.button("⬅️ Back to Menu"): navigate('main_menu')
             render_admin_panel()
         elif st.session_state.current_page == 'settings':
-            if st.button("Back to Menu"): navigate('main_menu')
+            if st.button("⬅️ Back to Menu"): navigate('main_menu')
             render_settings()
         else:
             if st.session_state.active_program == 'dengue':
