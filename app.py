@@ -19,6 +19,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+st.markdown("""
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+""", unsafe_allow_html=True)
+
 # --- Clean, Professional CSS tailored to your TOML ---
 st.markdown("""
     <style>
