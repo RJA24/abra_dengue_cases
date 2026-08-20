@@ -518,11 +518,10 @@ def render_dengue():
             st.rerun()
             
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("##### 📊 Surveillance Filters")
         
         df = load_data()
         
-        with st.expander("Filter Options", expanded=True):
+        with st.expander("Surveillance Filters", expanded=True):
             muni_options = ["All Municipalities"] + sorted(df["Muncity"].dropna().unique().tolist())
             muncity_input = st.selectbox("Select Municipality:", options=muni_options, index=0)
             sex_input = st.multiselect("Select Sex:", options=df["Sex"].dropna().unique(), default=[])
