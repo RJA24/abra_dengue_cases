@@ -54,30 +54,31 @@ st.markdown("""
         background-color: transparent !important;
         border: none !important;
         box-shadow: none !important;
-        color: #334155 !important;
-        font-weight: 500 !important;
-        padding: 10px 16px !important;
+        padding: 8px 12px !important;
         border-radius: 8px !important;
-        transition: all 0.2s ease !important;
         width: 100% !important;
+        transition: all 0.2s ease !important;
     }
     
-    /* This completely forces the inner nested text to the left */
+    /* Brutally force the internal Streamlit text to the left */
     section[data-testid="stSidebar"] .stButton > button div[data-testid="stMarkdownContainer"] {
         display: flex !important;
-        justify-content: flex-start !important;
-        text-align: left !important;
         width: 100% !important;
+        justify-content: flex-start !important;
     }
     
     section[data-testid="stSidebar"] .stButton > button p {
-        font-size: 16px !important;
-        text-align: left !important;
+        font-size: 15px !important;
+        font-weight: 500 !important;
+        color: #334155 !important;
         margin: 0 !important;
+        text-align: left !important;
     }
     
     section[data-testid="stSidebar"] .stButton > button:hover {
         background-color: #f1f5f9 !important; /* Subtle hover effect */
+    }
+    section[data-testid="stSidebar"] .stButton > button:hover p {
         color: #0f172a !important;
     }
     /* ---------------------------------------------------- */
@@ -89,9 +90,8 @@ st.markdown("""
         border: 1px solid #cbd5e1 !important;
         background-color: #ffffff !important;
         transition: all 0.2s ease-in-out !important;
-        justify-content: center !important; /* Ensure main menu buttons stay centered */
+        justify-content: center !important; 
     }
-    /* Ensure the big buttons STAY centered even with the new sidebar rules */
     div.element-container:has(.big-btn-marker) + div.element-container button div[data-testid="stMarkdownContainer"] {
         justify-content: center !important;
         text-align: center !important;
@@ -517,16 +517,17 @@ def render_dengue():
             st.session_state.active_program = None
             st.rerun()
             
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin: 15px 0; border: none; border-bottom: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #0f172a; margin: 0 0 15px 0;'>📊 Filters</h4>", unsafe_allow_html=True)
         
         df = load_data()
         
-        with st.expander("Surveillance Filters", expanded=True):
-            muni_options = ["All Municipalities"] + sorted(df["Muncity"].dropna().unique().tolist())
-            muncity_input = st.selectbox("Select Municipality:", options=muni_options, index=0)
-            sex_input = st.multiselect("Select Sex:", options=df["Sex"].dropna().unique(), default=[])
-            clin_input = st.multiselect("Clinical Classification:", options=df["ClinClass"].dropna().unique(), default=[])
+        muni_options = ["All Municipalities"] + sorted(df["Muncity"].dropna().unique().tolist())
+        muncity_input = st.selectbox("Municipality", options=muni_options, index=0)
+        sex_input = st.multiselect("Sex", options=df["Sex"].dropna().unique(), default=[])
+        clin_input = st.multiselect("Clinical Class", options=df["ClinClass"].dropna().unique(), default=[])
             
+        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
         if st.button("🔄 Refresh Data", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
@@ -567,14 +568,14 @@ def render_dengue():
         if "MorbidityWeek" in filtered_df.columns:
             cases_by_week = filtered_df.groupby("MorbidityWeek").size().reset_index(name="Case Count")
             fig_line = px.line(cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, title="Dengue Epidemic Curve by Morbidity Week")
-            fig_line.update_traces(line_color='#2563eb', marker=dict(size=10))
+            fig_line.update_traces(line_color="#eba925", marker=dict(size=10))
             fig_line.update_layout(height=500)
             st.plotly_chart(fig_line, use_container_width=True)
 
         if "MorbidityMonth" in filtered_df.columns:
             month_counts = filtered_df.groupby("MorbidityMonth").size().reset_index(name="Cases")
             fig_month = px.bar(month_counts, x="MorbidityMonth", y="Cases", text_auto=True, title="Dengue Cases by Morbidity Month")
-            fig_month.update_traces(marker_color='#1d4ed8')
+            fig_month.update_traces(marker_color="#b300cf")
             fig_month.update_layout(height=450)
             st.plotly_chart(fig_month, use_container_width=True)
         
@@ -719,22 +720,19 @@ def main():
         # --- Clean, professional sidebar matching the Upwork/Coinbase styling ---
         with st.sidebar:
             
-            # Centered profile block 
+            # Centered profile block utilizing your custom dengue.png image
+            # Note: ?raw=true is appended to force GitHub to serve the raw image file
             st.markdown(f"""
-            <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px;">
-                <div style="font-size: 60px; line-height: 1;">👤</div>
-                <h3 style="margin: 10px 0 0 0; color: #0f172a;">{st.session_state.username}</h3>
-                <p style="margin: 0; color: #64748b; font-size: 14px;">{st.session_state.role.title()}</p>
+            <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0; margin-bottom: 15px;">
+                <img src="https://github.com/RJA24/abra_dengue_cases/blob/main/dengue.png?raw=true" style="width: 80px; height: 80px; border-radius: 50%; object-fit: contain; margin-bottom: 10px; background-color: #f8fafc; padding: 5px; border: 1px solid #e2e8f0;">
+                <h3 style="margin: 0; color: #0f172a; font-size: 1.2rem;">{st.session_state.username}</h3>
+                <p style="margin: 0; color: #64748b; font-size: 0.9rem;">{st.session_state.role.title()}</p>
             </div>
             """, unsafe_allow_html=True)
             
-            # Borderless list items with icons
             if st.session_state.role == 'admin':
                 if st.button("🛡️ Admin Panel", use_container_width=True): navigate('admin')
             if st.button("⚙️ Profile & Settings", use_container_width=True): navigate('settings')
-            
-            # Add some spacing before the logout button
-            st.markdown("<br><br>", unsafe_allow_html=True)
             if st.button("🚪 Sign out", use_container_width=True): logout()
 
         # --- Routing Logic ---
