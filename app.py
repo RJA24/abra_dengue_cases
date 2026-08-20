@@ -671,11 +671,12 @@ def main():
             st.markdown(f"### 👤 {st.session_state.username}")
             st.caption(f"Role: {st.session_state.role.title()}")
             st.markdown("<br>", unsafe_allow_html=True)
-            
-            if st.session_state.role == 'admin':
-                if st.button("Admin Panel", use_container_width=True): navigate('admin')
-            if st.button("Account Settings", use_container_width=True): navigate('settings')
-            if st.button("Log Out", use_container_width=True): logout()
+
+            with st.expander("Settings", expanded=False):
+                if st.session_state.role == 'admin':
+                    if st.button("Admin Panel", use_container_width=True): navigate('admin')
+                if st.button("Account Settings", use_container_width=True): navigate('settings')
+                if st.button("Log Out", use_container_width=True): logout()
             
             st.divider()
 
