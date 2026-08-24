@@ -27,6 +27,10 @@ st.markdown("""
 # --- Clean, Professional CSS tailored to your TOML ---
 st.markdown("""
     <style>
+    /* Hide the Streamlit 'Manage app' button and developer toolbar */
+    .stDeployButton { display: none !important; }
+    [data-testid="stToolbar"] { display: none !important; }
+
     /* Adjust top padding to pull title higher */
     .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
     
@@ -238,14 +242,20 @@ def clean_muni_name(raw_name):
     raw = str(raw_name).upper()
     raw = unicodedata.normalize('NFKD', raw).encode('ASCII', 'ignore').decode('utf-8')
     raw_alpha = re.sub(r'[^A-Z]', '', raw)
-    if "LICUAN" in raw_alpha or "BAAY" in raw_alpha: return "LICUAN-BAAY"
-    if "PENAR" in raw_alpha or "RUBIA" in raw_alpha: return "PEÑARRUBIA"
-    if "PAZ" in raw_alpha: return "LA PAZ"
-    if "JUAN" in raw_alpha: return "SAN JUAN"
-    if "ISIDRO" in raw_alpha: return "SAN ISIDRO"
-    if "QUINTIN" in raw_alpha: return "SAN QUINTIN"
+    
+    # 1. Exact Match Check (Safest)
     for muni in ALL_ABRA_MUNICIPALITIES:
-        if re.sub(r'[^A-Z]', '', muni.replace("Ñ", "N")) in raw_alpha: return muni
+        if raw_alpha == re.sub(r'[^A-Z]', '', muni.replace("Ñ", "N")):
+            return muni
+            
+    # 2. Strict Aliases
+    if raw_alpha in ["LICUANBAAY", "LICUAN", "BAAY"]: return "LICUAN-BAAY"
+    if raw_alpha in ["PENARRUBIA", "PENARUBIA", "PENAR", "RUBIA"]: return "PEÑARRUBIA"
+    if raw_alpha in ["LAPAZ", "PAZ"]: return "LA PAZ"
+    if raw_alpha in ["SANJUAN", "JUAN"]: return "SAN JUAN"
+    if raw_alpha in ["SANISIDRO", "ISIDRO"]: return "SAN ISIDRO"
+    if raw_alpha in ["SANQUINTIN", "QUINTIN"]: return "SAN QUINTIN"
+    
     return raw_name
 
 def clean_brgy_name(raw_name):
@@ -259,13 +269,21 @@ def clean_brgy_name(raw_name):
 def get_muni_name_from_props(props):
     keys = ['ADM3_EN', 'MUN_NAME', 'NAME_3', 'MUNICIPALITY']
     upper_props = {str(k).upper(): str(v) for k, v in props.items()}
+    
+    # Check explicit municipality keys first
     for k in keys:
         if k in upper_props:
             std = clean_muni_name(upper_props[k])
             if std in ALL_ABRA_MUNICIPALITIES: return std
+            
+    # Fallback ONLY for exact matches (prevents barangay names from false-triggering)
     for val in props.values():
-        std = clean_muni_name(str(val))
-        if std in ALL_ABRA_MUNICIPALITIES: return std
+        val_str = str(val).upper()
+        val_alpha = re.sub(r'[^A-Z]', '', unicodedata.normalize('NFKD', val_str).encode('ASCII', 'ignore').decode('utf-8'))
+        for muni in ALL_ABRA_MUNICIPALITIES:
+            muni_alpha = re.sub(r'[^A-Z]', '', muni.replace("Ñ", "N"))
+            if val_alpha == muni_alpha: 
+                return muni
     return None
 
 def extract_brgy_name(props):
@@ -518,6 +536,8 @@ def render_main_menu():
             pass
 
 def render_dengue():
+    df = load_data()
+
     with st.sidebar:
         if st.button("Back to Menu", icon=":material/arrow_back:", use_container_width=True):
             st.session_state.active_program = None
@@ -525,8 +545,6 @@ def render_dengue():
             
         st.markdown("<hr style='margin: 15px 0; border: none; border-bottom: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
         st.markdown("<h4 style='color: #0f172a; margin: 0 0 15px 0;'><i class='fa-solid fa-arrow-down-short-wide' style='color: #475569;'></i> Filters</h4>", unsafe_allow_html=True)
-        
-        df = load_data()
         
         muni_options = ["All Municipalities"] + sorted(df["Muncity"].dropna().unique().tolist())
         muncity_input = st.selectbox("Municipality", options=muni_options, index=0)
@@ -545,7 +563,6 @@ def render_dengue():
     filtered_df = df.query("Muncity in @muncity_filter & Sex in @sex_filter & ClinClass in @clin_filter")
 
     st.title("Abra PESU: Dengue Surveillance Dashboard")
-    st.caption("As of Morbidity Week: " + str(filtered_df["MorbidityWeek"].max()) if "MorbidityWeek" in filtered_df.columns else "Data not available")
     st.markdown("---")
 
     total_cases = len(filtered_df)
@@ -655,7 +672,7 @@ def render_dengue():
                 x=females,
                 name='Female',
                 orientation='h',
-                marker_color="#ff6809", # Pink/Orange
+                marker_color='#ec4899', # Pink/Orange
                 text=females.astype(int),
                 hovertemplate="Female: %{text}<extra></extra>"
             ))
@@ -762,7 +779,7 @@ def render_dengue():
                     st.info("Not enough numeric morbidity week data to calculate clustering.")
             except Exception as e:
                 st.error(f"Error generating clustering table: {e}")
-        
+
     with tab3:
         if "ClinClass" in filtered_df.columns:
             class_counts = filtered_df["ClinClass"].value_counts().reset_index()
