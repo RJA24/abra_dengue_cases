@@ -709,14 +709,24 @@ def render_dengue():
                             pivot_cluster = pivot_cluster.rename(columns=rename_dict)
                             pivot_cluster.rename(columns={'Muncity': 'Municipality'}, inplace=True)
                             
-                            # 8. Apply a heat-map gradient (RdYlGn_r scales Green=low, Yellow=mid, Red=high)
+                            # 8. Pure Python/CSS Custom Color thresholds (No Matplotlib needed!)
+                            def apply_threshold_colors(val):
+                                try:
+                                    v = int(val)
+                                    if v == 0: return ''
+                                    elif v < 3: return 'background-color: #86efac; color: #0f172a; font-weight: bold;' # Green
+                                    elif v < 5: return 'background-color: #fde047; color: #0f172a; font-weight: bold;' # Yellow
+                                    else: return 'background-color: #fca5a5; color: #0f172a; font-weight: bold;'       # Red
+                                except:
+                                    return ''
+                                    
                             color_cols = [f"MW{w}" for w in latest_weeks]
-                            styled_df = pivot_cluster.style.background_gradient(
-                                subset=color_cols, 
-                                cmap="RdYlGn_r", 
-                                low=0, 
-                                high=0.8
-                            )
+                            
+                            # Pandas 2.1+ uses .map() for element-wise styling
+                            if hasattr(pivot_cluster.style, 'map'):
+                                styled_df = pivot_cluster.style.map(apply_threshold_colors, subset=color_cols)
+                            else: # Fallback for older pandas versions
+                                styled_df = pivot_cluster.style.applymap(apply_threshold_colors, subset=color_cols)
                             
                             st.dataframe(styled_df, use_container_width=True, hide_index=True)
                         else:
