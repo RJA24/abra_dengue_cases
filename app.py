@@ -635,7 +635,7 @@ def render_dengue():
                 x=females,
                 name='Female',
                 orientation='h',
-                marker_color='#ec4899', # Pink/Orange
+                marker_color="#ff6809", # Pink/Orange
                 text=females.astype(int),
                 hovertemplate="Female: %{text}<extra></extra>"
             ))
@@ -709,14 +709,13 @@ def render_dengue():
                             pivot_cluster = pivot_cluster.rename(columns=rename_dict)
                             pivot_cluster.rename(columns={'Muncity': 'Municipality'}, inplace=True)
                             
-                            # 8. Pure Python/CSS Custom Color thresholds (No Matplotlib needed!)
-                            def apply_threshold_colors(val):
+                            # 8. Pure Python/CSS Custom Color (Solid Green for any value > 0)
+                            def apply_green_color(val):
                                 try:
-                                    v = int(val)
-                                    if v == 0: return ''
-                                    elif v < 3: return 'background-color: #86efac; color: #0f172a; font-weight: bold;' # Green
-                                    elif v < 5: return 'background-color: #fde047; color: #0f172a; font-weight: bold;' # Yellow
-                                    else: return 'background-color: #fca5a5; color: #0f172a; font-weight: bold;'       # Red
+                                    if int(val) > 0:
+                                        # Solid green matching the standard spreadsheet highlight
+                                        return 'background-color: #8bc34a; color: #0f172a; font-weight: bold;' 
+                                    return ''
                                 except:
                                     return ''
                                     
@@ -724,9 +723,9 @@ def render_dengue():
                             
                             # Pandas 2.1+ uses .map() for element-wise styling
                             if hasattr(pivot_cluster.style, 'map'):
-                                styled_df = pivot_cluster.style.map(apply_threshold_colors, subset=color_cols)
+                                styled_df = pivot_cluster.style.map(apply_green_color, subset=color_cols)
                             else: # Fallback for older pandas versions
-                                styled_df = pivot_cluster.style.applymap(apply_threshold_colors, subset=color_cols)
+                                styled_df = pivot_cluster.style.applymap(apply_green_color, subset=color_cols)
                             
                             st.dataframe(styled_df, use_container_width=True, hide_index=True)
                         else:
