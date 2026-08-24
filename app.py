@@ -608,7 +608,7 @@ def render_dengue():
             # 2. Group the data by Age Group and Sex
             pyr_data = df_pyr.groupby(['AgeGroup', 'Sex']).size().reset_index(name='Count')
             
-            # 3. Split Male and Female (Ensuring we catch 'M', 'Male', 'F', 'Female' formats securely)
+            # 3. Split Male and Female securely
             males = pyr_data[pyr_data['Sex'].str.upper().str.startswith('M')].groupby('AgeGroup')['Count'].sum().reindex(age_labels).fillna(0)
             females = pyr_data[pyr_data['Sex'].str.upper().str.startswith('F')].groupby('AgeGroup')['Count'].sum().reindex(age_labels).fillna(0)
             
@@ -635,7 +635,7 @@ def render_dengue():
                 x=females,
                 name='Female',
                 orientation='h',
-                marker_color='#ec4899', # Pink
+                marker_color='#ec4899', # Pink/Orange
                 text=females.astype(int),
                 hovertemplate="Female: %{text}<extra></extra>"
             ))
@@ -663,6 +663,62 @@ def render_dengue():
             )
             
             st.plotly_chart(fig_pyr, use_container_width=True)
+
+        # --- CLUSTERING BARANGAY TABLE ---
+        if "MorbidityWeek" in filtered_df.columns and "Barangay" in filtered_df.columns and "Muncity" in filtered_df.columns:
+            st.markdown("<hr style='margin: 30px 0; border: none; border-bottom: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+            st.subheader("Clustering Barangay")
+            
+            try:
+                # 1. Identify the 4 latest numerical Morbidity Weeks available in the dataset
+                valid_weeks = sorted(filtered_df["MorbidityWeek"].dropna().astype(int).unique())
+                latest_weeks = valid_weeks[-4:] if len(valid_weeks) >= 4 else valid_weeks
+                
+                if latest_weeks:
+                    # 2. Filter data explicitly to those 4 weeks
+                    cluster_df = filtered_df[filtered_df["MorbidityWeek"].fillna(-1).astype(int).isin(latest_weeks)]
+                    
+                    if not cluster_df.empty:
+                        # 3. Create the Pivot Table (Rows: Muncity/Barangay | Cols: MWs)
+                        pivot_cluster = pd.crosstab(
+                            index=[cluster_df['Muncity'], cluster_df['Barangay']],
+                            columns=cluster_df['MorbidityWeek'].astype(int)
+                        ).fillna(0).astype(int)
+                        
+                        # Guarantee all 4 weeks exist as columns (in case 1 week had 0 global cases)
+                        for w in latest_weeks:
+                            if w not in pivot_cluster.columns:
+                                pivot_cluster[w] = 0
+                        pivot_cluster = pivot_cluster[latest_weeks]
+                        
+                        # 4. Calculate Total
+                        pivot_cluster['Total'] = pivot_cluster.sum(axis=1)
+                        
+                        # 5. Apply the Epidemiological Clustering threshold (Total >= 3)
+                        pivot_cluster = pivot_cluster[pivot_cluster['Total'] >= 3].reset_index()
+                        
+                        if not pivot_cluster.empty:
+                            # 6. Format column names for presentation
+                            rename_dict = {w: f"MW{w}" for w in latest_weeks}
+                            pivot_cluster = pivot_cluster.rename(columns=rename_dict)
+                            pivot_cluster.rename(columns={'Muncity': 'Municipality'}, inplace=True)
+                            
+                            # 7. Apply a heat-map gradient (RdYlGn_r scales Green=low, Yellow=mid, Red=high)
+                            color_cols = [f"MW{w}" for w in latest_weeks]
+                            styled_df = pivot_cluster.style.background_gradient(
+                                subset=color_cols, 
+                                cmap="RdYlGn_r", 
+                                low=0, 
+                                high=0.8
+                            )
+                            
+                            st.dataframe(styled_df, use_container_width=True, hide_index=True)
+                        else:
+                            st.info("No clustering barangays (≥ 3 cases) detected in the last 4 morbidity weeks.")
+                    else:
+                        st.info("No case data available for the latest 4 morbidity weeks.")
+            except Exception as e:
+                st.warning("Could not generate clustering table. Ensure 'MorbidityWeek' data is numerical.")
         
     with tab3:
         if "ClinClass" in filtered_df.columns:
