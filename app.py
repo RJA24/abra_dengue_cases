@@ -692,7 +692,7 @@ def render_dengue():
                             columns=cluster_df['MW_Clean']
                         ).fillna(0).astype(int)
                         
-                        # Guarantee all 4 weeks exist as columns (in case a week had 0 global cases)
+                        # Guarantee all 4 weeks exist as columns
                         for w in latest_weeks:
                             if w not in pivot_cluster.columns:
                                 pivot_cluster[w] = 0
@@ -705,6 +705,10 @@ def render_dengue():
                         pivot_cluster = pivot_cluster[pivot_cluster['Total'] >= 3].reset_index()
                         
                         if not pivot_cluster.empty:
+                            # ---> THE FIX: Force Python to sort 'Ñ' alongside 'N' alphabetically <---
+                            pivot_cluster['Sort_Key'] = pivot_cluster['Muncity'].str.replace('Ñ', 'N')
+                            pivot_cluster = pivot_cluster.sort_values(by=['Sort_Key', 'Barangay']).drop(columns=['Sort_Key'])
+                            
                             # 7. Format column names for presentation
                             rename_dict = {w: f"MW{w}" for w in latest_weeks}
                             pivot_cluster = pivot_cluster.rename(columns=rename_dict)
@@ -714,7 +718,6 @@ def render_dengue():
                             def apply_green_color(val):
                                 try:
                                     if int(val) > 0:
-                                        # Solid green matching the standard spreadsheet highlight
                                         return 'background-color: #8bc34a; color: #0f172a; font-weight: bold;' 
                                     return ''
                                 except:
