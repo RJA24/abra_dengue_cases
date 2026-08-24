@@ -670,40 +670,46 @@ def render_dengue():
             st.subheader("Clustering Barangay")
             
             try:
-                # 1. Identify the 4 latest numerical Morbidity Weeks available in the dataset
-                valid_weeks = sorted(filtered_df["MorbidityWeek"].dropna().astype(int).unique())
+                # 1. Brutally clean the MorbidityWeek column (forces text/blanks to NaN, then drops them)
+                clean_df = filtered_df.copy()
+                clean_df['MW_Clean'] = pd.to_numeric(clean_df['MorbidityWeek'], errors='coerce')
+                clean_df = clean_df.dropna(subset=['MW_Clean'])
+                clean_df['MW_Clean'] = clean_df['MW_Clean'].astype(int)
+                
+                # 2. Identify the 4 latest numerical Morbidity Weeks
+                valid_weeks = sorted(clean_df["MW_Clean"].unique())
                 latest_weeks = valid_weeks[-4:] if len(valid_weeks) >= 4 else valid_weeks
                 
                 if latest_weeks:
-                    # 2. Filter data explicitly to those 4 weeks
-                    cluster_df = filtered_df[filtered_df["MorbidityWeek"].fillna(-1).astype(int).isin(latest_weeks)]
+                    # 3. Filter data explicitly to those 4 weeks
+                    cluster_df = clean_df[clean_df["MW_Clean"].isin(latest_weeks)]
                     
                     if not cluster_df.empty:
-                        # 3. Create the Pivot Table (Rows: Muncity/Barangay | Cols: MWs)
+                        # 4. Create the Pivot Table (Rows: Muncity/Barangay | Cols: MWs)
                         pivot_cluster = pd.crosstab(
                             index=[cluster_df['Muncity'], cluster_df['Barangay']],
-                            columns=cluster_df['MorbidityWeek'].astype(int)
+                            columns=cluster_df['MW_Clean']
                         ).fillna(0).astype(int)
                         
-                        # Guarantee all 4 weeks exist as columns (in case 1 week had 0 global cases)
+                        # Guarantee all 4 weeks exist as columns (in case a week had 0 global cases)
                         for w in latest_weeks:
                             if w not in pivot_cluster.columns:
                                 pivot_cluster[w] = 0
                         pivot_cluster = pivot_cluster[latest_weeks]
                         
-                        # 4. Calculate Total
+                        # 5. Calculate Total
                         pivot_cluster['Total'] = pivot_cluster.sum(axis=1)
                         
-                        # 5. Apply the Epidemiological Clustering threshold (Total >= 3)
+                        # 6. Apply the Epidemiological Clustering threshold (Total >= 3)
                         pivot_cluster = pivot_cluster[pivot_cluster['Total'] >= 3].reset_index()
                         
                         if not pivot_cluster.empty:
-                            # 6. Format column names for presentation
+                            # 7. Format column names for presentation
                             rename_dict = {w: f"MW{w}" for w in latest_weeks}
                             pivot_cluster = pivot_cluster.rename(columns=rename_dict)
                             pivot_cluster.rename(columns={'Muncity': 'Municipality'}, inplace=True)
                             
-                            # 7. Apply a heat-map gradient (RdYlGn_r scales Green=low, Yellow=mid, Red=high)
+                            # 8. Apply a heat-map gradient (RdYlGn_r scales Green=low, Yellow=mid, Red=high)
                             color_cols = [f"MW{w}" for w in latest_weeks]
                             styled_df = pivot_cluster.style.background_gradient(
                                 subset=color_cols, 
@@ -717,8 +723,10 @@ def render_dengue():
                             st.info("No clustering barangays (≥ 3 cases) detected in the last 4 morbidity weeks.")
                     else:
                         st.info("No case data available for the latest 4 morbidity weeks.")
+                else:
+                    st.info("Not enough numeric morbidity week data to calculate clustering.")
             except Exception as e:
-                st.warning("Could not generate clustering table. Ensure 'MorbidityWeek' data is numerical.")
+                st.error(f"Error generating clustering table: {e}")
         
     with tab3:
         if "ClinClass" in filtered_df.columns:
