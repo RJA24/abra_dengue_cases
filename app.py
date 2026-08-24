@@ -563,6 +563,7 @@ def render_dengue():
     filtered_df = df.query("Muncity in @muncity_filter & Sex in @sex_filter & ClinClass in @clin_filter")
 
     st.title("Abra PESU: Dengue Surveillance Dashboard")
+    st.caption("As of Morbidity Week: " + str(filtered_df["MorbidityWeek"].max()) if "MorbidityWeek" in filtered_df.columns else "No Morbidity Week Data Available")
     st.markdown("---")
 
     total_cases = len(filtered_df)
