@@ -553,13 +553,23 @@ def render_dengue():
     avg_age = round(filtered_df["AgeYears"].mean(), 1) if not filtered_df.empty and "AgeYears" in filtered_df.columns else 0
     
     # --- DYNAMIC GEO KPI LOGIC ---
+    ABRA_BRGY_COUNTS = {
+        "BANGUED": 31, "BOLINEY": 8, "BUCAY": 21, "BUCLOC": 4, "DAGUIOMAN": 4, 
+        "DANGLAS": 7, "DOLORES": 15, "LA PAZ": 12, "LACUB": 6, "LAGANGILANG": 17, 
+        "LAGAYAN": 5, "LANGIDEN": 6, "LICUAN-BAAY": 11, "LUBA": 8, "MALIBCONG": 12, 
+        "MANABO": 11, "PEÑARRUBIA": 9, "PIDIGAN": 15, "PILAR": 19, "SALLAPADAN": 9, 
+        "SAN ISIDRO": 9, "SAN JUAN": 19, "SAN QUINTIN": 6, "TAYUM": 11, "TINEG": 10, 
+        "TUBO": 10, "VILLAVICIOSA": 8
+    }
+
     if muncity_input == "All Municipalities":
         geo_kpi_title = "Affected Municipalities"
         geo_kpi_value = f"{filtered_df['Muncity'].nunique()} / 27"
     else:
         geo_kpi_title = "Affected Barangays"
         affected_brgy = filtered_df['Barangay'].nunique() if 'Barangay' in filtered_df.columns else 0
-        geo_kpi_value = f"{affected_brgy}"
+        total_brgy = ABRA_BRGY_COUNTS.get(muncity_input, "?")
+        geo_kpi_value = f"{affected_brgy} / {total_brgy}"
     # -----------------------------
 
     def create_kpi_card(title, value, border_color):
