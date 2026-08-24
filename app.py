@@ -666,23 +666,26 @@ def render_dengue():
             st.plotly_chart(fig_pyr, use_container_width=True)
 
         # --- CLUSTERING BARANGAY TABLE ---
-        if "MorbidityWeek" in filtered_df.columns and "Barangay" in filtered_df.columns and "Muncity" in filtered_df.columns:
+        if "MorbidityWeek" in df.columns and "Barangay" in filtered_df.columns and "Muncity" in filtered_df.columns:
             st.markdown("<hr style='margin: 30px 0; border: none; border-bottom: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
             st.subheader("Clustering Barangay")
             
             try:
-                # 1. Brutally clean the MorbidityWeek column (forces text/blanks to NaN, then drops them)
+                # 1. ANCHOR TIMELINE: Get the latest 4 weeks from the GLOBAL dataset, not the filtered one.
+                # This prevents the columns from time-traveling backward when a specific municipality is selected.
+                global_df = df.copy()
+                global_df['MW_Clean'] = pd.to_numeric(global_df['MorbidityWeek'], errors='coerce')
+                global_weeks = sorted(global_df['MW_Clean'].dropna().astype(int).unique())
+                latest_weeks = global_weeks[-4:] if len(global_weeks) >= 4 else global_weeks
+                
+                # 2. Clean the CURRENTLY FILTERED dataset
                 clean_df = filtered_df.copy()
                 clean_df['MW_Clean'] = pd.to_numeric(clean_df['MorbidityWeek'], errors='coerce')
                 clean_df = clean_df.dropna(subset=['MW_Clean'])
                 clean_df['MW_Clean'] = clean_df['MW_Clean'].astype(int)
                 
-                # 2. Identify the 4 latest numerical Morbidity Weeks
-                valid_weeks = sorted(clean_df["MW_Clean"].unique())
-                latest_weeks = valid_weeks[-4:] if len(valid_weeks) >= 4 else valid_weeks
-                
                 if latest_weeks:
-                    # 3. Filter data explicitly to those 4 weeks
+                    # 3. Filter data explicitly to the global top 4 weeks
                     cluster_df = clean_df[clean_df["MW_Clean"].isin(latest_weeks)]
                     
                     if not cluster_df.empty:
@@ -705,16 +708,16 @@ def render_dengue():
                         pivot_cluster = pivot_cluster[pivot_cluster['Total'] >= 3].reset_index()
                         
                         if not pivot_cluster.empty:
-                            # ---> THE FIX: Force Python to sort 'Ñ' alongside 'N' alphabetically <---
+                            # 7. Force correct alphabetical sorting including 'Ñ'
                             pivot_cluster['Sort_Key'] = pivot_cluster['Muncity'].str.replace('Ñ', 'N')
                             pivot_cluster = pivot_cluster.sort_values(by=['Sort_Key', 'Barangay']).drop(columns=['Sort_Key'])
                             
-                            # 7. Format column names for presentation
+                            # 8. Format column names for presentation
                             rename_dict = {w: f"MW{w}" for w in latest_weeks}
                             pivot_cluster = pivot_cluster.rename(columns=rename_dict)
                             pivot_cluster.rename(columns={'Muncity': 'Municipality'}, inplace=True)
                             
-                            # 8. Pure Python/CSS Custom Color (Solid Green for any value > 0)
+                            # 9. Pure Python/CSS Custom Color (Solid Green for any value > 0)
                             def apply_green_color(val):
                                 try:
                                     if int(val) > 0:
