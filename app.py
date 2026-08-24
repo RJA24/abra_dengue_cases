@@ -551,7 +551,16 @@ def render_dengue():
     total_cases = len(filtered_df)
     total_deaths = len(filtered_df[filtered_df["Outcome"] == "D"]) if "Outcome" in filtered_df.columns else 0
     avg_age = round(filtered_df["AgeYears"].mean(), 1) if not filtered_df.empty and "AgeYears" in filtered_df.columns else 0
-    affected_muni = filtered_df["Muncity"].nunique()
+    
+    # --- DYNAMIC GEO KPI LOGIC ---
+    if muncity_input == "All Municipalities":
+        geo_kpi_title = "Affected Municipalities"
+        geo_kpi_value = f"{filtered_df['Muncity'].nunique()} / 27"
+    else:
+        geo_kpi_title = "Affected Barangays"
+        affected_brgy = filtered_df['Barangay'].nunique() if 'Barangay' in filtered_df.columns else 0
+        geo_kpi_value = f"{affected_brgy}"
+    # -----------------------------
 
     def create_kpi_card(title, value, border_color):
         return f"""
@@ -565,7 +574,7 @@ def render_dengue():
     with col1: st.markdown(create_kpi_card("Total Confirmed Cases", f"{total_cases:,}", "#2563eb"), unsafe_allow_html=True)
     with col2: st.markdown(create_kpi_card("Total Fatalities", f"{total_deaths:,}", "#ef4444"), unsafe_allow_html=True)
     with col3: st.markdown(create_kpi_card("Average Age (Years)", avg_age, "#10b981"), unsafe_allow_html=True)
-    with col4: st.markdown(create_kpi_card("Affected Municipalities", f"{affected_muni} / 27", "#f59e0b"), unsafe_allow_html=True)
+    with col4: st.markdown(create_kpi_card(geo_kpi_title, geo_kpi_value, "#f59e0b"), unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
 
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
