@@ -574,7 +574,7 @@ def render_dengue():
     with tab1:
         if "MorbidityWeek" in filtered_df.columns:
             cases_by_week = filtered_df.groupby("MorbidityWeek").size().reset_index(name="Case Count")
-            fig_line = px.line(cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, title="Dengue Epidemic Curve by Morbidity Week")
+            fig_line = px.line(cases_by_week, x="MorbidityWeek", y="Case Count", markers=True, title="Dengue Trend by Morbidity Week")
             fig_line.update_traces(line_color='#eba925', marker=dict(size=10))
             fig_line.update_layout(height=500)
             st.plotly_chart(fig_line, use_container_width=True)
