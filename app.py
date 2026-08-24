@@ -596,9 +596,73 @@ def render_dengue():
             st.plotly_chart(fig_bar, use_container_width=True)
 
         if "AgeYears" in filtered_df.columns and "Sex" in filtered_df.columns:
-            fig_hist = px.histogram(filtered_df, x="AgeYears", nbins=25, title="Age and Sex Distribution of Cases", color="Sex", barmode="group", color_discrete_sequence=["#2563eb", "#ec4899"])
-            fig_hist.update_layout(height=500)
-            st.plotly_chart(fig_hist, use_container_width=True)
+            
+            # --- POPULATION PYRAMID LOGIC ---
+            # 1. Define custom age bins exactly like your reference image
+            bins = [-1, 0.99, 4, 9, 14, 19, 44, 59, 200]
+            age_labels = ['< 1 y/o', '1-4 y/o', '5-9 y/o', '10-14 y/o', '15-19 y/o', '20-44 y/o', '45-59 y/o', '60 y/o & above']
+            
+            df_pyr = filtered_df.copy()
+            df_pyr['AgeGroup'] = pd.cut(df_pyr['AgeYears'], bins=bins, labels=age_labels, right=True)
+            
+            # 2. Group the data by Age Group and Sex
+            pyr_data = df_pyr.groupby(['AgeGroup', 'Sex']).size().reset_index(name='Count')
+            
+            # 3. Split Male and Female (Ensuring we catch 'M', 'Male', 'F', 'Female' formats securely)
+            males = pyr_data[pyr_data['Sex'].str.upper().str.startswith('M')].groupby('AgeGroup')['Count'].sum().reindex(age_labels).fillna(0)
+            females = pyr_data[pyr_data['Sex'].str.upper().str.startswith('F')].groupby('AgeGroup')['Count'].sum().reindex(age_labels).fillna(0)
+            
+            # 4. Invert Male values to draw the bars backwards to the left
+            males_negative = males * -1
+
+            # 5. Build the Plotly Figure
+            fig_pyr = go.Figure()
+            
+            # Add Male trace (Left Side)
+            fig_pyr.add_trace(go.Bar(
+                y=age_labels,
+                x=males_negative,
+                name='Male',
+                orientation='h',
+                marker_color='#2563eb', # Blue
+                text=males.astype(int), # Keep the real positive number for hover data
+                hovertemplate="Male: %{text}<extra></extra>"
+            ))
+            
+            # Add Female trace (Right Side)
+            fig_pyr.add_trace(go.Bar(
+                y=age_labels,
+                x=females,
+                name='Female',
+                orientation='h',
+                marker_color='#ec4899', # Pink
+                text=females.astype(int),
+                hovertemplate="Female: %{text}<extra></extra>"
+            ))
+
+            # 6. Dynamically fix the X-axis so the negative side displays as absolute positive numbers
+            max_val = int(max(males.max(), females.max()))
+            if max_val == 0: max_val = 10
+            step = max(1, max_val // 5)
+            
+            # Generate symmetrical ticks for aesthetic balance
+            tick_vals = list(range(-((max_val // step) * step + step), ((max_val // step) * step + step) + step, step))
+            tick_text = [str(abs(v)) for v in tick_vals]
+
+            fig_pyr.update_layout(
+                title="Age and Sex Distribution of Cases",
+                barmode='relative',
+                bargap=0.1,
+                height=500,
+                xaxis=dict(
+                    tickvals=tick_vals,
+                    ticktext=tick_text,
+                    title="No. of Cases"
+                ),
+                yaxis=dict(title="Age Group")
+            )
+            
+            st.plotly_chart(fig_pyr, use_container_width=True)
         
     with tab3:
         if "ClinClass" in filtered_df.columns:
