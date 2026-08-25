@@ -983,6 +983,81 @@ def render_tb():
     # UI Tabs for TB Module
     tab1, tab2, tab3 = st.tabs(["Patient Demographics", "Treatment Outcomes", "Raw Line List"])
 
+    def render_tb():
+    with st.sidebar:
+        if st.button("Back to Menu", icon=":material/arrow_back:", use_container_width=True):
+            st.session_state.active_program = None
+            st.rerun()
+            
+        st.markdown("<hr style='margin: 15px 0; border: none; border-bottom: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #0f172a; margin: 0 0 15px 0;'><i class='fa-solid fa-folder-open' style='color: #475569;'></i> Datasets</h4>", unsafe_allow_html=True)
+        
+        # Let the user choose which masterlist to analyze
+        dataset_choice = st.radio(
+            "Select TB Registry:",
+            ["Active 2026 Data", "Historical Data"],
+            index=0,
+            label_visibility="collapsed"
+        )
+        
+        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+        if st.button("Refresh Data", icon=":material/refresh:", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+
+    st.title("Abra PESU: Tuberculosis Control Program")
+    st.markdown("---")
+
+    # Load the specific tabs based on user selection
+    if dataset_choice == "Active 2026 Data":
+        df_dstb = load_tb_data("2026 DSTB")
+        df_drtb = load_tb_data("2026 DRTB")
+        df_tpt = load_tb_data("2026 TPT")
+        df_hiv = load_tb_data("2026 HIV")
+        st.caption("Currently analyzing current year case registries.")
+    else:
+        df_dstb = load_tb_data("DSTB 2015-2025")
+        df_drtb = load_tb_data("DRTB 2015-2025")
+        df_tpt = load_tb_data("TPT 2021-2025")
+        df_hiv = load_tb_data("HIV 2021-2025")
+        st.caption("Currently analyzing retrospective historical case registries.")
+
+    # Combine DSTB and DRTB for the unified dashboard visuals
+    df_combined = pd.concat([df_dstb, df_drtb], ignore_index=True)
+
+    if df_combined.empty:
+        st.warning("No case data found in the selected Google Sheet tabs.")
+        return
+
+    # Basic KPI calculations
+    total_cases = len(df_combined)
+    affected_muni = df_combined["Muncity"].nunique() if "Muncity" in df_combined.columns else 0
+    
+    # Calculate Treatment Success (Cured + Treatment Completed)
+    success_count = 0
+    if "Outcome/Status" in df_combined.columns:
+        success_statuses = ["CURED", "TREATMENT COMPLETED"]
+        success_count = len(df_combined[df_combined["Outcome/Status"].str.upper().isin(success_statuses)])
+
+    def create_kpi_card(title, value, border_color):
+        return f"""
+        <div style="background-color: #ffffff; padding: 22px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; border-left: 8px solid {border_color}; text-align: center;">
+            <p style="margin: 0; font-size: 1rem; color: #64748b; font-weight: 600; text-transform: uppercase;">{title}</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 2.6rem; color: #0f172a; font-weight: 800;">{value}</h2>
+        </div>
+        """
+
+    col1, col2, col3 = st.columns(3)
+    with col1: st.markdown(create_kpi_card("Total Registered Cases", f"{total_cases:,}", "#2563eb"), unsafe_allow_html=True)
+    with col2: st.markdown(create_kpi_card("Successful Outcomes", f"{success_count:,}", "#10b981"), unsafe_allow_html=True)
+    with col3: st.markdown(create_kpi_card("Affected Municipalities", f"{affected_muni} / 27", "#f59e0b"), unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # UI Tabs for TB Module
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "Patient Demographics", "Treatment Outcomes", "Preventive Treatment (TPT)", "TB-HIV Collaboration", "Raw Line List"
+    ])
+
     with tab1:
         st.subheader("Demographic Distribution")
         
@@ -997,15 +1072,11 @@ def render_tb():
 
         # 2. Age and Sex Population Pyramid
         if "Age" in df_combined.columns and "Sex" in df_combined.columns:
-            # Clean Age column strictly to prevent errors with missing data
             df_combined['Age_Clean'] = pd.to_numeric(df_combined['Age'], errors='coerce').fillna(-1)
-            
             bins = [-1, 0.99, 4, 9, 14, 19, 44, 59, 200]
             age_labels = ['< 1 y/o', '1-4 y/o', '5-9 y/o', '10-14 y/o', '15-19 y/o', '20-44 y/o', '45-59 y/o', '60 y/o & above']
-            
             df_pyr = df_combined.copy()
             df_pyr['AgeGroup'] = pd.cut(df_pyr['Age_Clean'], bins=bins, labels=age_labels, right=True)
-            
             pyr_data = df_pyr.groupby(['AgeGroup', 'Sex']).size().reset_index(name='Count')
             
             males = pyr_data[pyr_data['Sex'].astype(str).str.upper().str.startswith('M')].groupby('AgeGroup')['Count'].sum().reindex(age_labels).fillna(0)
@@ -1020,7 +1091,6 @@ def render_tb():
             max_val = int(max(males.max(), females.max())) if not males.empty and not females.empty else 10
             if max_val == 0: max_val = 10
             step = max(1, max_val // 5)
-            
             tick_vals = list(range(-((max_val // step) * step + step), ((max_val // step) * step + step) + step, step))
             tick_text = [str(abs(v)) for v in tick_vals]
 
@@ -1029,10 +1099,7 @@ def render_tb():
             
     with tab2:
         st.subheader("Clinical & Treatment Outcomes")
-        
-        # Split into two columns for the pie charts
         c1, c2 = st.columns(2)
-        
         with c1:
             if "Outcome/Status" in df_combined.columns:
                 outcome_counts = df_combined["Outcome/Status"].fillna("Unknown").value_counts().reset_index()
@@ -1047,7 +1114,6 @@ def render_tb():
                 fig_pie_reg = px.pie(reg_counts, names="Registration Group", values="Count", hole=0.45, title="Patient Registration Group")
                 st.plotly_chart(fig_pie_reg, use_container_width=True)
 
-        # Full-width bar chart for Bacteriologic Status below the pies
         if "Bacteriologic Status" in df_combined.columns:
             bac_counts = df_combined["Bacteriologic Status"].fillna("Unknown").value_counts().reset_index()
             bac_counts.columns = ["Bacteriologic Status", "Count"]
@@ -1056,6 +1122,65 @@ def render_tb():
             st.plotly_chart(fig_bar_bac, use_container_width=True)
 
     with tab3:
+        st.subheader("Preventive Treatment (TPT) Analytics")
+        if not df_tpt.empty:
+            st.metric("Total Patients on Preventive Treatment (TPT)", len(df_tpt))
+            
+            c3, c4 = st.columns(2)
+            with c3:
+                if "Indication for TPT" in df_tpt.columns:
+                    ind_counts = df_tpt["Indication for TPT"].fillna("Unknown").value_counts().reset_index()
+                    ind_counts.columns = ["Indication", "Count"]
+                    fig_ind = px.pie(ind_counts, names="Indication", values="Count", hole=0.4, title="Indication for TPT")
+                    st.plotly_chart(fig_ind, use_container_width=True)
+            
+            with c4:
+                if "TPT Regimen" in df_tpt.columns:
+                    reg_tpt_counts = df_tpt["TPT Regimen"].fillna("Unknown").value_counts().reset_index()
+                    reg_tpt_counts.columns = ["Regimen", "Count"]
+                    fig_reg_tpt = px.bar(reg_tpt_counts, x="Regimen", y="Count", text_auto=True, title="TPT Regimen Distribution")
+                    fig_reg_tpt.update_traces(marker_color='#8b5cf6')
+                    st.plotly_chart(fig_reg_tpt, use_container_width=True)
+        else:
+            st.info("No TPT data available for the selected period.")
+
+    with tab4:
+        st.subheader("TB-HIV Collaborative Activities")
+        if not df_hiv.empty:
+            # We aggregate the quarterly facility reports into a provincial total
+            try:
+                col_total_tb = "All Reg Group 15 above TB Cases"
+                col_tested = "All Reg Group 15 above TB Cases Tested or with Known HIV Status"
+                col_positive = "All Reg Group 15 above Confirmed HIV+TB Patients"
+                col_art = "All Reg Group 15 above Confirmed HIV+TB Patients Started on ART"
+                
+                total_tb_15 = df_hiv[col_total_tb].sum()
+                total_tested = df_hiv[col_tested].sum()
+                total_pos = df_hiv[col_positive].sum()
+                total_art = df_hiv[col_art].sum()
+                
+                testing_rate = (total_tested / total_tb_15 * 100) if total_tb_15 > 0 else 0
+                
+                c5, c6, c7 = st.columns(3)
+                c5.metric("Eligible TB Patients (15+ yrs)", f"{total_tb_15:,}")
+                c6.metric("Tested for HIV", f"{total_tested:,}", f"{testing_rate:.1f}% Coverage")
+                c7.metric("Co-infected & on ART", f"{total_art:,} / {total_pos:,}")
+                
+                # Bar chart by facility to track reporting compliance
+                if "Facility" in df_hiv.columns:
+                    facility_summary = df_hiv.groupby("Facility")[[col_total_tb, col_tested]].sum().reset_index()
+                    fig_fac = px.bar(facility_summary, x="Facility", y=[col_total_tb, col_tested], 
+                                     title="HIV Testing Compliance by Facility",
+                                     labels={"value": "Patient Count", "variable": "Metric"},
+                                     barmode="group")
+                    st.plotly_chart(fig_fac, use_container_width=True)
+                    
+            except Exception as e:
+                st.error("HIV Data columns do not match the expected ITIS export format.")
+        else:
+            st.info("No HIV data available for the selected period.")
+
+    with tab5:
         st.subheader("Unified TB Registry (DSTB & DRTB)")
         st.dataframe(df_combined, use_container_width=True, hide_index=True, height=600)
 
