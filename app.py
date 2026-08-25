@@ -984,10 +984,76 @@ def render_tb():
     tab1, tab2, tab3 = st.tabs(["Patient Demographics", "Treatment Outcomes", "Raw Line List"])
 
     with tab1:
-        st.write("Demographics charts will go here.")
+        st.subheader("Demographic Distribution")
         
+        # 1. Cases per Municipality
+        if "Muncity" in df_combined.columns:
+            muncity_counts = df_combined["Muncity"].value_counts().reset_index()
+            muncity_counts.columns = ["Municipality", "Count"]
+            fig_bar = px.bar(muncity_counts, x="Municipality", y="Count", title="Total TB Cases per Municipality", text_auto=True)
+            fig_bar.update_traces(marker_color="#0284c7") # A clean TB-themed blue
+            fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, height=500)
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+        # 2. Age and Sex Population Pyramid
+        if "Age" in df_combined.columns and "Sex" in df_combined.columns:
+            # Clean Age column strictly to prevent errors with missing data
+            df_combined['Age_Clean'] = pd.to_numeric(df_combined['Age'], errors='coerce').fillna(-1)
+            
+            bins = [-1, 0.99, 4, 9, 14, 19, 44, 59, 200]
+            age_labels = ['< 1 y/o', '1-4 y/o', '5-9 y/o', '10-14 y/o', '15-19 y/o', '20-44 y/o', '45-59 y/o', '60 y/o & above']
+            
+            df_pyr = df_combined.copy()
+            df_pyr['AgeGroup'] = pd.cut(df_pyr['Age_Clean'], bins=bins, labels=age_labels, right=True)
+            
+            pyr_data = df_pyr.groupby(['AgeGroup', 'Sex']).size().reset_index(name='Count')
+            
+            males = pyr_data[pyr_data['Sex'].astype(str).str.upper().str.startswith('M')].groupby('AgeGroup')['Count'].sum().reindex(age_labels).fillna(0)
+            females = pyr_data[pyr_data['Sex'].astype(str).str.upper().str.startswith('F')].groupby('AgeGroup')['Count'].sum().reindex(age_labels).fillna(0)
+            
+            males_negative = males * -1
+
+            fig_pyr = go.Figure()
+            fig_pyr.add_trace(go.Bar(y=age_labels, x=males_negative, name='Male', orientation='h', marker_color='#2563eb', text=males.astype(int), hovertemplate="Male: %{text}<extra></extra>"))
+            fig_pyr.add_trace(go.Bar(y=age_labels, x=females, name='Female', orientation='h', marker_color='#ec4899', text=females.astype(int), hovertemplate="Female: %{text}<extra></extra>"))
+
+            max_val = int(max(males.max(), females.max())) if not males.empty and not females.empty else 10
+            if max_val == 0: max_val = 10
+            step = max(1, max_val // 5)
+            
+            tick_vals = list(range(-((max_val // step) * step + step), ((max_val // step) * step + step) + step, step))
+            tick_text = [str(abs(v)) for v in tick_vals]
+
+            fig_pyr.update_layout(title="Age and Sex Distribution of TB Cases", barmode='relative', bargap=0.1, height=500, xaxis=dict(tickvals=tick_vals, ticktext=tick_text, title="No. of Cases"), yaxis=dict(title="Age Group"))
+            st.plotly_chart(fig_pyr, use_container_width=True)
+            
     with tab2:
-        st.write("Treatment outcome tracking will go here.")
+        st.subheader("Clinical & Treatment Outcomes")
+        
+        # Split into two columns for the pie charts
+        c1, c2 = st.columns(2)
+        
+        with c1:
+            if "Outcome/Status" in df_combined.columns:
+                outcome_counts = df_combined["Outcome/Status"].fillna("Unknown").value_counts().reset_index()
+                outcome_counts.columns = ["Outcome", "Count"]
+                fig_pie_out = px.pie(outcome_counts, names="Outcome", values="Count", hole=0.45, title="Treatment Outcomes")
+                st.plotly_chart(fig_pie_out, use_container_width=True)
+                
+        with c2:
+            if "Registration Group" in df_combined.columns:
+                reg_counts = df_combined["Registration Group"].fillna("Unknown").value_counts().reset_index()
+                reg_counts.columns = ["Registration Group", "Count"]
+                fig_pie_reg = px.pie(reg_counts, names="Registration Group", values="Count", hole=0.45, title="Patient Registration Group")
+                st.plotly_chart(fig_pie_reg, use_container_width=True)
+
+        # Full-width bar chart for Bacteriologic Status below the pies
+        if "Bacteriologic Status" in df_combined.columns:
+            bac_counts = df_combined["Bacteriologic Status"].fillna("Unknown").value_counts().reset_index()
+            bac_counts.columns = ["Bacteriologic Status", "Count"]
+            fig_bar_bac = px.bar(bac_counts, x="Bacteriologic Status", y="Count", text_auto=True, title="Bacteriologic Status")
+            fig_bar_bac.update_traces(marker_color='#10b981')
+            st.plotly_chart(fig_bar_bac, use_container_width=True)
 
     with tab3:
         st.subheader("Unified TB Registry (DSTB & DRTB)")
