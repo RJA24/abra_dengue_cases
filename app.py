@@ -318,6 +318,22 @@ def load_data():
     if 'Muncity' in df.columns: df['Muncity'] = df['Muncity'].apply(clean_muni_name)
     return df
 
+@st.cache_data(ttl=600)
+def load_tb_data(sheet_name):
+    # Dynamically read specific tabs from the master PESU Google Sheet
+    encoded_sheet_name = requests.utils.quote(sheet_name)
+    csv_url = f"{SHEET_URL}/gviz/tq?tqx=out:csv&sheet={encoded_sheet_name}"
+    
+    try:
+        df = pd.read_csv(csv_url)
+        # Standardize the City/Municipality column to match our geojson logic
+        if 'City/Municipality' in df.columns:
+            df['Muncity'] = df['City/Municipality'].apply(clean_muni_name)
+        return df
+    except Exception as e:
+        st.error(f"Error loading {sheet_name}: Ensure the tab name exactly matches the Google Sheet.")
+        return pd.DataFrame()
+
 @st.cache_data(ttl="24h")
 def fetch_muncity_geojson():
     urls = [
@@ -527,8 +543,9 @@ def render_main_menu():
             
     with col2:
         st.markdown('<span class="big-btn-marker"></span>', unsafe_allow_html=True)
-        if st.button("Next Program Sir 😊", use_container_width=True):
-            pass
+        if st.button("Tuberculosis", use_container_width=True):
+            st.session_state.active_program = 'tb'
+            st.rerun()
             
     with col3:
         st.markdown('<span class="big-btn-marker"></span>', unsafe_allow_html=True)
@@ -898,6 +915,85 @@ def render_dengue():
 # MAIN ROUTING LOGIC
 # ==========================================
 
+def render_tb():
+    with st.sidebar:
+        if st.button("Back to Menu", icon=":material/arrow_back:", use_container_width=True):
+            st.session_state.active_program = None
+            st.rerun()
+            
+        st.markdown("<hr style='margin: 15px 0; border: none; border-bottom: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #0f172a; margin: 0 0 15px 0;'><i class='fa-solid fa-folder-open' style='color: #475569;'></i> Datasets</h4>", unsafe_allow_html=True)
+        
+        # Let the user choose which masterlist to analyze
+        dataset_choice = st.radio(
+            "Select TB Registry:",
+            ["Active 2026 Data", "Historical (2015-2025)"],
+            index=0,
+            label_visibility="collapsed"
+        )
+        
+        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+        if st.button("Refresh Data", icon=":material/refresh:", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+
+    st.title("Abra PESU: Tuberculosis Control Program")
+    st.markdown("---")
+
+    # Load the specific tabs based on user selection to save memory
+    if dataset_choice == "Active 2026 Data":
+        df_dstb = load_tb_data("2026 DSTB")
+        df_drtb = load_tb_data("2026 DRTB")
+        st.caption("Currently analyzing current year case registries (DSTB & DRTB).")
+    else:
+        df_dstb = load_tb_data("DSTB 2015-2025")
+        df_drtb = load_tb_data("DRTB 2015-2025")
+        st.caption("Currently analyzing retrospective 10-year case registries.")
+
+    # Combine DSTB and DRTB for the unified dashboard visuals
+    df_combined = pd.concat([df_dstb, df_drtb], ignore_index=True)
+
+    if df_combined.empty:
+        st.warning("No data found in the selected Google Sheet tabs.")
+        return
+
+    # Basic KPI calculations
+    total_cases = len(df_combined)
+    affected_muni = df_combined["Muncity"].nunique() if "Muncity" in df_combined.columns else 0
+    
+    # Calculate Treatment Success (Cured + Treatment Completed)
+    success_count = 0
+    if "Outcome/Status" in df_combined.columns:
+        success_statuses = ["CURED", "TREATMENT COMPLETED"]
+        success_count = len(df_combined[df_combined["Outcome/Status"].str.upper().isin(success_statuses)])
+
+    def create_kpi_card(title, value, border_color):
+        return f"""
+        <div style="background-color: #ffffff; padding: 22px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; border-left: 8px solid {border_color}; text-align: center;">
+            <p style="margin: 0; font-size: 1rem; color: #64748b; font-weight: 600; text-transform: uppercase;">{title}</p>
+            <h2 style="margin: 10px 0 0 0; font-size: 2.6rem; color: #0f172a; font-weight: 800;">{value}</h2>
+        </div>
+        """
+
+    col1, col2, col3 = st.columns(3)
+    with col1: st.markdown(create_kpi_card("Total Registered Cases", f"{total_cases:,}", "#2563eb"), unsafe_allow_html=True)
+    with col2: st.markdown(create_kpi_card("Successful Outcomes", f"{success_count:,}", "#10b981"), unsafe_allow_html=True)
+    with col3: st.markdown(create_kpi_card("Affected Municipalities", f"{affected_muni} / 27", "#f59e0b"), unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # UI Tabs for TB Module
+    tab1, tab2, tab3 = st.tabs(["Patient Demographics", "Treatment Outcomes", "Raw Line List"])
+
+    with tab1:
+        st.write("Demographics charts will go here.")
+        
+    with tab2:
+        st.write("Treatment outcome tracking will go here.")
+
+    with tab3:
+        st.subheader("Unified TB Registry (DSTB & DRTB)")
+        st.dataframe(df_combined, use_container_width=True, hide_index=True, height=600)
+
 def main():
     if not st.session_state.logged_in:
         if st.session_state.current_page == 'register':
@@ -939,6 +1035,8 @@ def main():
         else:
             if st.session_state.active_program == 'dengue':
                 render_dengue()
+            elif st.session_state.active_program == 'tb':
+                render_tb()
             else:
                 render_main_menu()
 
