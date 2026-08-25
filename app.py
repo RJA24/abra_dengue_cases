@@ -915,60 +915,93 @@ def render_dengue():
 # ==========================================
 
 def render_tb():
+    # 1. Load data first so we can build dynamic filters
+    dataset_choice = st.session_state.get('tb_dataset_choice', "Active 2026 Data")
+    
+    if dataset_choice == "Active 2026 Data":
+        df_dstb = load_tb_data("2026 DSTB")
+        df_drtb = load_tb_data("2026 DRTB")
+        df_tpt = load_tb_data("2026 TPT")
+        df_hiv = load_tb_data("2026 HIV")
+    else:
+        df_dstb = load_tb_data("DSTB 2015-2025")
+        df_drtb = load_tb_data("DRTB 2015-2025")
+        df_tpt = load_tb_data("TPT 2021-2025")
+        df_hiv = load_tb_data("HIV 2021-2025")
+        
+    df_combined_raw = pd.concat([df_dstb, df_drtb], ignore_index=True)
+
     with st.sidebar:
         if st.button("Back to Menu", icon=":material/arrow_back:", use_container_width=True):
             st.session_state.active_program = None
             st.rerun()
             
         st.markdown("<hr style='margin: 15px 0; border: none; border-bottom: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
-        st.markdown("<h4 style='color: #0f172a; margin: 0 0 15px 0;'><i class='fa-solid fa-folder-open' style='color: #475569;'></i> Datasets</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #0f172a; margin: 0 0 15px 0;'><i class='fa-solid fa-folder-open' style='color: #475569;'></i> TB Controls</h4>", unsafe_allow_html=True)
         
-        # Let the user choose which masterlist to analyze
-        dataset_choice = st.radio(
+        new_choice = st.radio(
             "Select TB Registry:",
             ["Active 2026 Data", "Historical Data"],
-            index=0,
+            index=0 if dataset_choice == "Active 2026 Data" else 1,
             label_visibility="collapsed"
         )
+        if new_choice != dataset_choice:
+            st.session_state.tb_dataset_choice = new_choice
+            st.rerun()
+
+        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
         
+        # --- NEW: Municipality Filter for TB ---
+        if not df_combined_raw.empty and "Muncity" in df_combined_raw.columns:
+            muni_options = ["All Municipalities"] + sorted(df_combined_raw["Muncity"].dropna().unique().tolist())
+            muncity_input = st.selectbox("Filter Municipality", options=muni_options, index=0)
+        else:
+            muncity_input = "All Municipalities"
+            
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
         if st.button("Refresh Data", icon=":material/refresh:", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
+    # 2. Apply Filters
+    if muncity_input != "All Municipalities":
+        df_combined = df_combined_raw[df_combined_raw["Muncity"] == muncity_input]
+    else:
+        df_combined = df_combined_raw
+
     st.title("Abra PESU: Tuberculosis Control Program")
     st.markdown("---")
 
-    # Load the specific tabs based on user selection
-    if dataset_choice == "Active 2026 Data":
-        df_dstb = load_tb_data("2026 DSTB")
-        df_drtb = load_tb_data("2026 DRTB")
-        df_tpt = load_tb_data("2026 TPT")
-        df_hiv = load_tb_data("2026 HIV")
-        st.caption("Currently analyzing current year case registries.")
-    else:
-        df_dstb = load_tb_data("DSTB 2015-2025")
-        df_drtb = load_tb_data("DRTB 2015-2025")
-        df_tpt = load_tb_data("TPT 2021-2025")
-        df_hiv = load_tb_data("HIV 2021-2025")
-        st.caption("Currently analyzing retrospective historical case registries.")
-
-    # Combine DSTB and DRTB for the unified dashboard visuals
-    df_combined = pd.concat([df_dstb, df_drtb], ignore_index=True)
-
     if df_combined.empty:
-        st.warning("No case data found in the selected Google Sheet tabs.")
+        st.warning("No case data found for the selected filters.")
         return
 
-    # Basic KPI calculations
+    # 3. Dynamic KPIs
     total_cases = len(df_combined)
-    affected_muni = df_combined["Muncity"].nunique() if "Muncity" in df_combined.columns else 0
     
-    # Calculate Treatment Success (Cured + Treatment Completed)
     success_count = 0
     if "Outcome/Status" in df_combined.columns:
         success_statuses = ["CURED", "TREATMENT COMPLETED"]
         success_count = len(df_combined[df_combined["Outcome/Status"].str.upper().isin(success_statuses)])
+
+    # Dynamic Geo KPI (Matches Dengue logic)
+    ABRA_BRGY_COUNTS = {
+        "BANGUED": 31, "BOLINEY": 8, "BUCAY": 21, "BUCLOC": 4, "DAGUIOMAN": 4, 
+        "DANGLAS": 7, "DOLORES": 15, "LA PAZ": 12, "LACUB": 6, "LAGANGILANG": 17, 
+        "LAGAYAN": 5, "LANGIDEN": 6, "LICUAN-BAAY": 11, "LUBA": 8, "MALIBCONG": 12, 
+        "MANABO": 11, "PEÑARRUBIA": 9, "PIDIGAN": 15, "PILAR": 19, "SALLAPADAN": 9, 
+        "SAN ISIDRO": 9, "SAN JUAN": 19, "SAN QUINTIN": 6, "TAYUM": 11, "TINEG": 10, 
+        "TUBO": 10, "VILLAVICIOSA": 8
+    }
+
+    if muncity_input == "All Municipalities":
+        geo_kpi_title = "Affected Municipalities"
+        geo_kpi_value = f"{df_combined['Muncity'].nunique()} / 27"
+    else:
+        geo_kpi_title = "Affected Barangays"
+        affected_brgy = df_combined['Brgy'].nunique() if 'Brgy' in df_combined.columns else 0
+        total_brgy = ABRA_BRGY_COUNTS.get(muncity_input, "?")
+        geo_kpi_value = f"{affected_brgy} / {total_brgy}"
 
     def create_kpi_card(title, value, border_color):
         return f"""
@@ -981,27 +1014,43 @@ def render_tb():
     col1, col2, col3 = st.columns(3)
     with col1: st.markdown(create_kpi_card("Total Registered Cases", f"{total_cases:,}", "#2563eb"), unsafe_allow_html=True)
     with col2: st.markdown(create_kpi_card("Successful Outcomes", f"{success_count:,}", "#10b981"), unsafe_allow_html=True)
-    with col3: st.markdown(create_kpi_card("Affected Municipalities", f"{affected_muni} / 27", "#f59e0b"), unsafe_allow_html=True)
+    with col3: st.markdown(create_kpi_card(geo_kpi_title, geo_kpi_value, "#f59e0b"), unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # UI Tabs for TB Module
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "Patient Demographics", "Treatment Outcomes", "Preventive Treatment (TPT)", "TB-HIV Collaboration", "Raw Line List"
+    # 4. Expanded Tabs
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+        "Epidemiological Trends", "Demographics", "Clinical & Outcomes", 
+        "Preventive Treatment (TPT)", "TB-HIV Collaboration", "Choropleth Map", "Raw Line List"
     ])
 
     with tab1:
+        st.subheader("TB Case Detection Trends")
+        if "Date of Diagnosis" in df_combined.columns:
+            # Convert to datetime and extract Month-Year
+            df_combined['Diag_Date'] = pd.to_datetime(df_combined['Date of Diagnosis'], errors='coerce')
+            df_combined['Month_Year'] = df_combined['Diag_Date'].dt.to_period('M').astype(str)
+            
+            trend_df = df_combined.dropna(subset=['Month_Year']).groupby('Month_Year').size().reset_index(name='Cases')
+            trend_df = trend_df.sort_values('Month_Year')
+            
+            if not trend_df.empty:
+                fig_trend = px.line(trend_df, x='Month_Year', y='Cases', markers=True, title="TB Cases by Month of Diagnosis")
+                fig_trend.update_traces(line_color='#d97706', marker=dict(size=10))
+                fig_trend.update_layout(height=500, xaxis_title="Month", yaxis_title="Number of Cases")
+                st.plotly_chart(fig_trend, use_container_width=True)
+            else:
+                st.info("Insufficient date data for trend analysis.")
+
+    with tab2:
         st.subheader("Demographic Distribution")
-        
-        # 1. Cases per Municipality
-        if "Muncity" in df_combined.columns:
+        if "Muncity" in df_combined.columns and muncity_input == "All Municipalities":
             muncity_counts = df_combined["Muncity"].value_counts().reset_index()
             muncity_counts.columns = ["Municipality", "Count"]
             fig_bar = px.bar(muncity_counts, x="Municipality", y="Count", title="Total TB Cases per Municipality", text_auto=True)
-            fig_bar.update_traces(marker_color="#0284c7") # A clean TB-themed blue
+            fig_bar.update_traces(marker_color="#0284c7") 
             fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, height=500)
             st.plotly_chart(fig_bar, use_container_width=True)
 
-        # 2. Age and Sex Population Pyramid
         if "Age" in df_combined.columns and "Sex" in df_combined.columns:
             df_combined['Age_Clean'] = pd.to_numeric(df_combined['Age'], errors='coerce').fillna(-1)
             bins = [-1, 0.99, 4, 9, 14, 19, 44, 59, 200]
@@ -1012,7 +1061,6 @@ def render_tb():
             
             males = pyr_data[pyr_data['Sex'].astype(str).str.upper().str.startswith('M')].groupby('AgeGroup')['Count'].sum().reindex(age_labels).fillna(0)
             females = pyr_data[pyr_data['Sex'].astype(str).str.upper().str.startswith('F')].groupby('AgeGroup')['Count'].sum().reindex(age_labels).fillna(0)
-            
             males_negative = males * -1
 
             fig_pyr = go.Figure()
@@ -1028,7 +1076,7 @@ def render_tb():
             fig_pyr.update_layout(title="Age and Sex Distribution of TB Cases", barmode='relative', bargap=0.1, height=500, xaxis=dict(tickvals=tick_vals, ticktext=tick_text, title="No. of Cases"), yaxis=dict(title="Age Group"))
             st.plotly_chart(fig_pyr, use_container_width=True)
             
-    with tab2:
+    with tab3:
         st.subheader("Clinical & Treatment Outcomes")
         c1, c2 = st.columns(2)
         with c1:
@@ -1052,11 +1100,10 @@ def render_tb():
             fig_bar_bac.update_traces(marker_color='#10b981')
             st.plotly_chart(fig_bar_bac, use_container_width=True)
 
-    with tab3:
+    with tab4:
         st.subheader("Preventive Treatment (TPT) Analytics")
         if not df_tpt.empty:
             st.metric("Total Patients on Preventive Treatment (TPT)", len(df_tpt))
-            
             c3, c4 = st.columns(2)
             with c3:
                 if "Indication for TPT" in df_tpt.columns:
@@ -1064,7 +1111,6 @@ def render_tb():
                     ind_counts.columns = ["Indication", "Count"]
                     fig_ind = px.pie(ind_counts, names="Indication", values="Count", hole=0.4, title="Indication for TPT")
                     st.plotly_chart(fig_ind, use_container_width=True)
-            
             with c4:
                 if "TPT Regimen" in df_tpt.columns:
                     reg_tpt_counts = df_tpt["TPT Regimen"].fillna("Unknown").value_counts().reset_index()
@@ -1075,10 +1121,9 @@ def render_tb():
         else:
             st.info("No TPT data available for the selected period.")
 
-    with tab4:
+    with tab5:
         st.subheader("TB-HIV Collaborative Activities")
         if not df_hiv.empty:
-            # We aggregate the quarterly facility reports into a provincial total
             try:
                 col_total_tb = "All Reg Group 15 above TB Cases"
                 col_tested = "All Reg Group 15 above TB Cases Tested or with Known HIV Status"
@@ -1097,7 +1142,6 @@ def render_tb():
                 c6.metric("Tested for HIV", f"{total_tested:,}", f"{testing_rate:.1f}% Coverage")
                 c7.metric("Co-infected & on ART", f"{total_art:,} / {total_pos:,}")
                 
-                # Bar chart by facility to track reporting compliance
                 if "Facility" in df_hiv.columns:
                     facility_summary = df_hiv.groupby("Facility")[[col_total_tb, col_tested]].sum().reset_index()
                     fig_fac = px.bar(facility_summary, x="Facility", y=[col_total_tb, col_tested], 
@@ -1105,13 +1149,96 @@ def render_tb():
                                      labels={"value": "Patient Count", "variable": "Metric"},
                                      barmode="group")
                     st.plotly_chart(fig_fac, use_container_width=True)
-                    
             except Exception as e:
                 st.error("HIV Data columns do not match the expected ITIS export format.")
         else:
             st.info("No HIV data available for the selected period.")
 
-    with tab5:
+    with tab6:
+        map_style_choice = st.radio("Select Map Theme:", ["Light", "Street", "Satellite", "Dark"], horizontal=True, key="tb_map_theme")
+        style_map = {"Light": "carto-positron", "Street": "open-street-map", "Dark": "carto-darkmatter", "Satellite": "white-bg"}
+        label_color = 'white' if map_style_choice in ["Dark", "Satellite"] else 'black'
+
+        if muncity_input != "All Municipalities":
+            st.subheader(f"Geographic Heatmap: Barangays in {muncity_input}")
+            brgy_geojson, err = fetch_barangay_geojson(muncity_input)
+            
+            if brgy_geojson and "Brgy" in df_combined.columns:
+                all_geojson_brgys = [f['properties']['Standard_Name'] for f in brgy_geojson['features']]
+                all_geojson_originals = [f['properties']['Original_Name'] for f in brgy_geojson['features']]
+                
+                base_df = pd.DataFrame({"Join_Key": all_geojson_brgys, "Barangay_Display": all_geojson_originals, "Base_Cases": 0})
+                curr_cases = df_combined.groupby("Brgy").size().reset_index(name="Filtered_Cases")
+                curr_cases["Join_Key"] = curr_cases["Brgy"].apply(clean_brgy_name)
+                curr_cases = curr_cases.groupby("Join_Key")["Filtered_Cases"].sum().reset_index()
+                
+                map_data = pd.merge(base_df, curr_cases, on="Join_Key", how="left")
+                map_data["Total Cases"] = map_data["Filtered_Cases"].fillna(0).astype(int)
+                
+                lons, lats, texts = [], [], []
+                for feat in brgy_geojson['features']:
+                    std_name = feat['properties']['Standard_Name']
+                    display_name = feat['properties'].get('Original_Name', std_name)
+                    match = map_data[map_data['Join_Key'] == std_name]
+                    cases = match['Total Cases'].values[0] if not match.empty else 0
+                    lon, lat = get_polygon_centroid(feat['geometry'])
+                    if lon is not None and lat is not None:
+                        lons.append(lon); lats.append(lat)
+                        texts.append(f"{display_name.title()}<br>{int(cases)}")
+                
+                cam_lat = np.mean(lats) if lats else 17.58
+                cam_lon = np.mean(lons) if lons else 120.83
+                
+                fig_map = px.choropleth_mapbox(
+                    map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
+                    color='Total Cases', hover_name='Barangay_Display', color_continuous_scale="Blues",
+                    mapbox_style=style_map[map_style_choice], zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.85
+                )
+                
+                if map_style_choice == "Satellite":
+                    fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
+                
+                fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
+                fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
+                st.plotly_chart(fig_map, use_container_width=True)
+            else:
+                st.error(err if err else "Barangay column (Brgy) missing in data.")
+                
+        else:
+            st.subheader("Geographic Heatmap: Municipalities in Abra")
+            base_df = pd.DataFrame({"Muncity": ALL_ABRA_MUNICIPALITIES, "Base_Cases": 0})
+            curr_cases = df_combined.groupby("Muncity").size().reset_index(name="Filtered_Cases")
+            map_data = pd.merge(base_df, curr_cases, on="Muncity", how="left")
+            map_data["Total Cases"] = map_data["Filtered_Cases"].fillna(0).astype(int)
+            
+            abra_geojson = fetch_muncity_geojson()
+            if abra_geojson:
+                lons, lats, texts = [], [], []
+                for feat in abra_geojson['features']:
+                    std_name = feat['properties']['Standard_Name']
+                    match = map_data[map_data['Muncity'] == std_name]
+                    cases = match['Total Cases'].values[0] if not match.empty else 0
+                    lon, lat = get_polygon_centroid(feat['geometry'])
+                    if lon is not None and lat is not None:
+                        lons.append(lon); lats.append(lat)
+                        texts.append(f"{std_name.title()}<br>{int(cases)}")
+                        
+                fig_map = px.choropleth_mapbox(
+                    map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
+                    color='Total Cases', hover_name='Muncity', color_continuous_scale="Blues", # Changed to blue for TB
+                    mapbox_style=style_map[map_style_choice], zoom=8.8, center={"lat": 17.58, "lon": 120.83}, opacity=0.85
+                )
+                
+                if map_style_choice == "Satellite":
+                    fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
+
+                fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
+                fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
+                st.plotly_chart(fig_map, use_container_width=True)
+            else:
+                st.error("Could not fetch the Abra geographic boundaries.")
+
+    with tab7:
         st.subheader("Unified TB Registry (DSTB & DRTB)")
         st.dataframe(df_combined, use_container_width=True, hide_index=True, height=600)
 
@@ -1140,7 +1267,7 @@ def main():
             </div>
             """, unsafe_allow_html=True)
             
-            # Replaced Emoji with FontAwesome Shortcode Equivalent
+            
             if st.session_state.role == 'admin':
                 if st.button("Admin Panel", icon=":material/build:", use_container_width=True): navigate('admin')
             if st.button("Profile & Settings", icon=":material/settings:", use_container_width=True): navigate('settings')
