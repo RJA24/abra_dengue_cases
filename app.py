@@ -320,18 +320,17 @@ def load_data():
 
 @st.cache_data(ttl=600)
 def load_tb_data(sheet_name):
-    # Dynamically read specific tabs from the master PESU Google Sheet
-    encoded_sheet_name = requests.utils.quote(sheet_name)
-    csv_url = f"{SHEET_URL}/gviz/tq?tqx=out:csv&sheet={encoded_sheet_name}"
-    
     try:
-        df = pd.read_csv(csv_url)
+        # Use your already-configured Google Sheets Service Account connection!
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        df = conn.read(spreadsheet=SHEET_URL, worksheet=sheet_name, ttl=600)
+        
         # Standardize the City/Municipality column to match our geojson logic
         if 'City/Municipality' in df.columns:
             df['Muncity'] = df['City/Municipality'].apply(clean_muni_name)
         return df
     except Exception as e:
-        st.error(f"Error loading {sheet_name}: Ensure the tab name exactly matches the Google Sheet.")
+        st.error(f"Error loading {sheet_name}: {e}")
         return pd.DataFrame()
 
 @st.cache_data(ttl="24h")
