@@ -34,19 +34,30 @@ st.markdown("""
     .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
     
     /* --- HEADER & SIDEBAR TOGGLE FIX --- */
-    /* 1. Make the header transparent to remove the ugly white bar */
-    header[data-testid="stHeader"] { background: transparent !important; }
-    
-    /* 2. Force the sidebar toggle button to stand out against the background image */
-    [data-testid="stSidebarCollapsedControl"] {
-        background-color: rgba(255, 255, 255, 0.65) !important;
-        border-radius: 8px !important;
-        margin-top: 5px !important;
-        margin-left: 5px !important;
-        transition: all 0.2s ease-in-out;
+    /* Make the header transparent to remove the solid white bar */
+    header[data-testid="stHeader"] { 
+        background: transparent !important; 
     }
-    [data-testid="stSidebarCollapsedControl"]:hover {
-        background-color: rgba(255, 255, 255, 1.0) !important;
+    
+    /* Force the sidebar toggle button to be a highly visible floating button */
+    [data-testid="collapsedControl"] {
+        display: inline-flex !important;
+        visibility: visible !important;
+        background-color: rgba(255, 255, 255, 0.95) !important;
+        border-radius: 8px !important;
+        border: 1px solid #cbd5e1 !important;
+        box-shadow: 0px 4px 6px rgba(0,0,0,0.1) !important;
+        margin: 10px !important;
+        z-index: 999999 !important;
+    }
+    
+    [data-testid="collapsedControl"] svg {
+        fill: #0f172a !important; /* Force the icon arrow to be dark blue/black */
+    }
+
+    [data-testid="collapsedControl"]:hover {
+        background-color: #f1f5f9 !important;
+        border-color: #94a3b8 !important;
     }
     /* ----------------------------------- */
     
