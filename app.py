@@ -897,27 +897,23 @@ def render_dengue():
             st.plotly_chart(fig_dru, use_container_width=True)
 
     with tab4:
-        map_style_choice = st.radio("Select Map Theme:", ["Light", "Street", "Satellite", "Dark"], horizontal=True)
-        
-        style_map = {
-            "Light": "carto-positron",
-            "Street": "open-street-map",
-            "Dark": "carto-darkmatter",
-            "Satellite": "white-bg" 
-        }
+        # --- ADD THE MISSING MAP THEME SELECTORS ---
+        map_style_choice = st.radio("Select Map Theme:", ["Light", "Street", "Satellite", "Dark"], horizontal=True, key="dengue_map_theme")
+        style_map = {"Light": "carto-positron", "Street": "open-street-map", "Dark": "carto-darkmatter", "Satellite": "white-bg"}
         label_color = 'white' if map_style_choice in ["Dark", "Satellite"] else 'black'
-
+        
         if muncity_input != "All Municipalities":
             st.subheader(f"Geographic Heatmap: Barangays in {muncity_input}")
             brgy_geojson, err = fetch_barangay_geojson(muncity_input)
             
-            if brgy_geojson and "Barangay" in filtered_df.columns:
+            if brgy_geojson and "Brgy" in filtered_df.columns:
                 all_geojson_brgys = [f['properties']['Standard_Name'] for f in brgy_geojson['features']]
                 all_geojson_originals = [f['properties']['Original_Name'] for f in brgy_geojson['features']]
                 
                 base_df = pd.DataFrame({"Join_Key": all_geojson_brgys, "Barangay_Display": all_geojson_originals, "Base_Cases": 0})
-                curr_cases = filtered_df.groupby("Barangay").size().reset_index(name="Filtered_Cases")
-                curr_cases["Join_Key"] = curr_cases["Barangay"].apply(clean_brgy_name)
+                
+                curr_cases = filtered_df.groupby("Brgy").size().reset_index(name="Filtered_Cases")
+                curr_cases["Join_Key"] = curr_cases["Brgy"].apply(clean_brgy_name)
                 curr_cases = curr_cases.groupby("Join_Key")["Filtered_Cases"].sum().reset_index()
                 
                 map_data = pd.merge(base_df, curr_cases, on="Join_Key", how="left")
@@ -937,7 +933,7 @@ def render_dengue():
                 cam_lat = np.mean(lats) if lats else 17.58
                 cam_lon = np.mean(lons) if lons else 120.83
                 
-                # --- BULLETPROOF SAFETY CHECK (DENGUE BARANGAY) ---
+                # --- BULLETPROOF SAFETY CHECK ---
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     max_cases = int(map_data["Total Cases"].max())
                     safe_max = max(1, max_cases)
@@ -945,7 +941,7 @@ def render_dengue():
                     fig_map = px.choropleth_mapbox(
                         map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
                         color='Total Cases', hover_name='Barangay_Display', color_continuous_scale="Reds",
-                        range_color=[0, safe_max], # Prevent divide-by-zero crash
+                        range_color=[0, safe_max], 
                         mapbox_style=style_map[map_style_choice], zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.85
                     )
                     
@@ -957,6 +953,8 @@ def render_dengue():
                     st.plotly_chart(fig_map, use_container_width=True)
                 else:
                     st.warning("No geographic mapping data available for the selected filters.")
+            else:
+                st.error(err if err else "Barangay column (Brgy) missing in data.")
                 
         else:
             st.subheader("Geographic Heatmap: Municipalities in Abra")
@@ -976,8 +974,8 @@ def render_dengue():
                     if lon is not None and lat is not None:
                         lons.append(lon); lats.append(lat)
                         texts.append(f"{std_name.title()}<br>{int(cases)}")
-                        
-                # --- BULLETPROOF SAFETY CHECK (DENGUE MUNICIPALITY) ---
+                
+                # --- BULLETPROOF SAFETY CHECK ---
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     max_cases = int(map_data["Total Cases"].max())
                     safe_max = max(1, max_cases)
@@ -985,7 +983,7 @@ def render_dengue():
                     fig_map = px.choropleth_mapbox(
                         map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
                         color='Total Cases', hover_name='Muncity', color_continuous_scale="Reds",
-                        range_color=[0, safe_max], # Prevent divide-by-zero crash
+                        range_color=[0, safe_max], 
                         mapbox_style=style_map[map_style_choice], zoom=8.8, center={"lat": 17.58, "lon": 120.83}, opacity=0.85
                     )
                     
@@ -997,6 +995,8 @@ def render_dengue():
                     st.plotly_chart(fig_map, use_container_width=True)
                 else:
                     st.warning("No geographic mapping data available for the selected filters.")
+            else:
+                st.error("Could not fetch the Abra geographic boundaries.")
 
     with tab5:
         st.subheader("Surveillance Line List")
