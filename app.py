@@ -577,23 +577,28 @@ def render_dengue():
             st.cache_data.clear()
             st.rerun()
 
-    # Add inside the st.sidebar block in render_dengue()
-    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-    if not filtered_df.empty:
-        dengue_csv = filtered_df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="Download Filtered Data",
-            data=dengue_csv,
-            file_name=f"Abra_Dengue_Data_{muncity_input.replace(' ', '_')}.csv",
-            mime="text/csv",
-            icon=":material/download:",
-            use_container_width=True
-        )
 
     muncity_filter = df["Muncity"].dropna().unique() if muncity_input == "All Municipalities" else [muncity_input]
     sex_filter = sex_input if sex_input else df["Sex"].dropna().unique()
     clin_filter = clin_input if clin_input else df["ClinClass"].dropna().unique()
     filtered_df = df.query("Muncity in @muncity_filter & Sex in @sex_filter & ClinClass in @clin_filter")
+
+    # --- DOWNLOAD BUTTON LOGIC ---
+    with st.sidebar:
+        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+        if not filtered_df.empty:
+            dengue_csv = filtered_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="Download Filtered Data",
+                data=dengue_csv,
+                file_name=f"Abra_Dengue_Data_{muncity_input.replace(' ', '_')}.csv",
+                mime="text/csv",
+                icon=":material/download:",
+                use_container_width=True
+            )
+    # ------------------------------------
+
+    st.title("Abra PESU: Dengue Surveillance Dashboard")filtered_df = df.query("Muncity in @muncity_filter & Sex in @sex_filter & ClinClass in @clin_filter")
 
     st.title("Abra PESU: Dengue Surveillance Dashboard")
     st.caption("As of Morbidity Week: " + str(filtered_df["MorbidityWeek"].max()) if "MorbidityWeek" in filtered_df.columns else "No Morbidity Week Data Available")
