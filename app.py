@@ -593,7 +593,7 @@ def render_main_menu():
             
     with col3:
         st.markdown('<span class="big-btn-marker"></span>', unsafe_allow_html=True)
-        if st.button("Next Program Sir  😊", use_container_width=True):
+        if st.button("Nothing to see here now.", use_container_width=True):
             pass
 
 def render_dengue():
