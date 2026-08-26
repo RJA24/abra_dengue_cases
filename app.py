@@ -16,8 +16,7 @@ st.set_page_config(
     page_title="Abra PESU Portal", 
     page_icon="https://github.com/RJA24/abra_sia_2026/blob/main/PHO%20logo.png?raw=true", 
     layout="wide", 
-    initial_sidebar_state="hidden"
-)
+    initial_sidebar_state="uncollapsed")
 
 # Inject FontAwesome Library
 st.markdown("""
