@@ -1391,29 +1391,49 @@ def render_tb():
                     cases = match['Total Cases'].values[0] if not match.empty else 0
                     lon, lat = get_polygon_centroid(feat['geometry'])
                     if lon is not None and lat is not None:
-                        lons.append(lon); lats.append(lat)
+                        # MUST CAST TO FLOAT TO PREVENT JSON SERIALIZATION CRASHES
+                        lons.append(float(lon)); lats.append(float(lat))
                         texts.append(f"{display_name.title()}<br>{int(cases)}")
                 
-                cam_lat = np.mean(lats) if lats else 17.58
-                cam_lon = np.mean(lons) if lons else 120.83
+                # MUST CAST TO FLOAT
+                cam_lat = float(np.mean(lats)) if lats else 17.58
+                cam_lon = float(np.mean(lons)) if lons else 120.83
                 
-                # --- FIX: Prevent Plotly Divide-by-Zero Crash ---
-                max_cases = int(map_data["Total Cases"].max()) if not map_data.empty else 0
-                safe_max = max(1, max_cases)
-                
-                fig_map = px.choropleth_mapbox(
-                    map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
-                    color='Total Cases', hover_name='Barangay_Display', color_continuous_scale="Blues",
-                    range_color=[0, safe_max], # <-- explicitly setting the math range fixes the bug
-                    mapbox_style=style_map[map_style_choice], zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.85
-                )
-                
-                if map_style_choice == "Satellite":
-                    fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
-                
-                fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
-                fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
-                st.plotly_chart(fig_map, use_container_width=True)
+                if not map_data.empty and "Total Cases" in map_data.columns:
+                    max_cases = int(map_data["Total Cases"].max())
+                    safe_max = max(1, max_cases)
+                    
+                    try:
+                        # --- BULLETPROOF GRAPH OBJECTS ENGINE (BARANGAY) ---
+                        fig_map = go.Figure(go.Choroplethmapbox(
+                            geojson=brgy_geojson, 
+                            locations=map_data['Join_Key'], 
+                            featureidkey='properties.Standard_Name', 
+                            z=map_data['Total Cases'], 
+                            text=map_data['Barangay_Display'],
+                            hovertemplate="<b>%{text}</b><br>Total Cases: %{z}<extra></extra>",
+                            colorscale="Blues",
+                            zmin=0, 
+                            zmax=safe_max,
+                            marker={"opacity": 0.85}
+                        ))
+                        
+                        fig_map.update_layout(
+                            mapbox_style=style_map[map_style_choice],
+                            mapbox_zoom=11.5,
+                            mapbox_center={"lat": cam_lat, "lon": cam_lon},
+                            margin={"r":0,"t":20,"l":0,"b":0}
+                        )
+                        
+                        if map_style_choice == "Satellite":
+                            fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
+                        
+                        fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
+                        st.plotly_chart(fig_map, use_container_width=True)
+                    except Exception as e:
+                        st.error(f"Plotly encountered an internal error rendering the Barangay map: {e}")
+                else:
+                    st.warning("No geographic mapping data available for the selected filters.")
             else:
                 st.error(err if err else "Barangay column (Brgy) missing in data.")
                 
@@ -1433,26 +1453,45 @@ def render_tb():
                     cases = match['Total Cases'].values[0] if not match.empty else 0
                     lon, lat = get_polygon_centroid(feat['geometry'])
                     if lon is not None and lat is not None:
-                        lons.append(lon); lats.append(lat)
+                        # MUST CAST TO FLOAT
+                        lons.append(float(lon)); lats.append(float(lat))
                         texts.append(f"{std_name.title()}<br>{int(cases)}")
                 
-                # --- FIX: Prevent Plotly Divide-by-Zero Crash ---
-                max_cases = int(map_data["Total Cases"].max()) if not map_data.empty else 0
-                safe_max = max(1, max_cases)
+                if not map_data.empty and "Total Cases" in map_data.columns:
+                    max_cases = int(map_data["Total Cases"].max())
+                    safe_max = max(1, max_cases)
+                            
+                    try:
+                        # --- BULLETPROOF GRAPH OBJECTS ENGINE (MUNICIPALITY) ---
+                        fig_map = go.Figure(go.Choroplethmapbox(
+                            geojson=abra_geojson, 
+                            locations=map_data['Muncity'], 
+                            featureidkey='properties.Standard_Name', 
+                            z=map_data['Total Cases'], 
+                            text=map_data['Muncity'],
+                            hovertemplate="<b>%{text}</b><br>Total Cases: %{z}<extra></extra>",
+                            colorscale="Blues",
+                            zmin=0, 
+                            zmax=safe_max,
+                            marker={"opacity": 0.85}
+                        ))
                         
-                fig_map = px.choropleth_mapbox(
-                    map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
-                    color='Total Cases', hover_name='Muncity', color_continuous_scale="Blues",
-                    range_color=[0, safe_max], # <-- explicitly setting the math range fixes the bug
-                    mapbox_style=style_map[map_style_choice], zoom=8.8, center={"lat": 17.58, "lon": 120.83}, opacity=0.85
-                )
-                
-                if map_style_choice == "Satellite":
-                    fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
+                        fig_map.update_layout(
+                            mapbox_style=style_map[map_style_choice],
+                            mapbox_zoom=8.8,
+                            mapbox_center={"lat": 17.58, "lon": 120.83},
+                            margin={"r":0,"t":20,"l":0,"b":0}
+                        )
+                        
+                        if map_style_choice == "Satellite":
+                            fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
 
-                fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
-                fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
-                st.plotly_chart(fig_map, use_container_width=True)
+                        fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
+                        st.plotly_chart(fig_map, use_container_width=True)
+                    except Exception as e:
+                        st.error(f"Plotly encountered an internal error rendering the Municipality map: {e}")
+                else:
+                    st.warning("No geographic mapping data available for the selected filters.")
             else:
                 st.error("Could not fetch the Abra geographic boundaries.")
 
