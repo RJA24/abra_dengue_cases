@@ -16,7 +16,7 @@ st.set_page_config(
     page_title="Abra PESU Portal", 
     page_icon="https://github.com/RJA24/abra_sia_2026/blob/main/PHO%20logo.png?raw=true", 
     layout="wide", 
-    initial_sidebar_state="auto")
+    initial_sidebar_state="collapsed")
 
 # Inject FontAwesome Library
 st.markdown("""
@@ -34,8 +34,7 @@ st.markdown("""
     .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
     
     /* Hide default header/footer for a clean app feel */
-    header { background: transparent !important; }
-    #MainMenu {visibility: visible;} 
+    #MainMenu {visibility: hidden;} 
     footer {visibility: hidden;} 
     
     .js-plotly-plot { margin-bottom: 2rem; }
@@ -568,7 +567,6 @@ def render_main_menu():
         background-position: center !important;
         background-attachment: fixed !important;
     }
-    header[data-testid="stHeader"] { background: rgba(0,0,0,0) !important; }
     
     /* Custom Title Styling with shadow for readability over the background */
     .main-title {
