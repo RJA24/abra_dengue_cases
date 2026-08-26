@@ -936,10 +936,14 @@ def render_dengue():
                 
                 cam_lat = np.mean(lats) if lats else 17.58
                 cam_lon = np.mean(lons) if lons else 120.83
+
+                max_cases = int(map_data["Total Cases"].max()) if not map_data.empty else 0
+                safe_max = max(1, max_cases)
                 
                 fig_map = px.choropleth_mapbox(
                     map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
                     color='Total Cases', hover_name='Barangay_Display', color_continuous_scale="Reds",
+                    range_color=[0, safe_max],
                     mapbox_style=style_map[map_style_choice], zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.85
                 )
                 
@@ -970,10 +974,14 @@ def render_dengue():
                     if lon is not None and lat is not None:
                         lons.append(lon); lats.append(lat)
                         texts.append(f"{std_name.title()}<br>{int(cases)}")
+
+                max_cases = int(map_data["Total Cases"].max()) if not map_data.empty else 0
+                safe_max = max(1, max_cases)
                         
                 fig_map = px.choropleth_mapbox(
                     map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
                     color='Total Cases', hover_name='Muncity', color_continuous_scale="Reds",
+                    range_color=[0, safe_max],
                     mapbox_style=style_map[map_style_choice], zoom=8.8, center={"lat": 17.58, "lon": 120.83}, opacity=0.85
                 )
                 
