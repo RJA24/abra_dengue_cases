@@ -868,53 +868,61 @@ def render_dengue():
             st.subheader("Clustering Barangay")
             
             try:
-                # 1. ANCHOR TIMELINE: Get the latest 4 weeks from the GLOBAL dataset, not the filtered one.
-                # This prevents the columns from time-traveling backward when a specific municipality is selected.
+                # 1. ANCHOR TIMELINE: Get all available weeks
                 global_df = df.copy()
                 global_df['MW_Clean'] = pd.to_numeric(global_df['MorbidityWeek'], errors='coerce')
                 global_weeks = sorted(global_df['MW_Clean'].dropna().astype(int).unique())
-                latest_weeks = global_weeks[-4:] if len(global_weeks) >= 4 else global_weeks
                 
-                # 2. Clean the CURRENTLY FILTERED dataset
+                # 2. Exclude the absolute latest week (incomplete data) and grab the 4 before it for the default
+                previous_weeks = global_weeks[:-1] if len(global_weeks) > 1 else []
+                default_weeks = previous_weeks[-4:] if len(previous_weeks) >= 4 else previous_weeks
+                
+                # 3. Add the Dropdown for the user to choose
+                selected_weeks = st.multiselect(
+                    "Select Morbidity Weeks for Clustering", 
+                    options=global_weeks, 
+                    default=default_weeks,
+                    help="The current (latest) week is excluded by default as its data is usually incomplete."
+                )
+                
+                # 4. Clean the CURRENTLY FILTERED dataset
                 clean_df = filtered_df.copy()
                 clean_df['MW_Clean'] = pd.to_numeric(clean_df['MorbidityWeek'], errors='coerce')
                 clean_df = clean_df.dropna(subset=['MW_Clean'])
                 clean_df['MW_Clean'] = clean_df['MW_Clean'].astype(int)
                 
-                if latest_weeks:
-                    # 3. Filter data explicitly to the global top 4 weeks
-                    cluster_df = clean_df[clean_df["MW_Clean"].isin(latest_weeks)]
+                if selected_weeks:
+                    # 5. Filter data explicitly to the selected weeks
+                    cluster_df = clean_df[clean_df["MW_Clean"].isin(selected_weeks)]
+                    selected_weeks = sorted(selected_weeks) # Keep columns chronological
                     
                     if not cluster_df.empty:
-                        # 4. Create the Pivot Table (Rows: Muncity/Barangay | Cols: MWs)
+                        # 6. Create the Pivot Table
                         pivot_cluster = pd.crosstab(
                             index=[cluster_df['Muncity'], cluster_df['Barangay']],
                             columns=cluster_df['MW_Clean']
                         ).fillna(0).astype(int)
                         
-                        # Guarantee all 4 weeks exist as columns
-                        for w in latest_weeks:
+                        # Guarantee all selected weeks exist as columns
+                        for w in selected_weeks:
                             if w not in pivot_cluster.columns:
                                 pivot_cluster[w] = 0
-                        pivot_cluster = pivot_cluster[latest_weeks]
+                        pivot_cluster = pivot_cluster[selected_weeks]
                         
-                        # 5. Calculate Total
+                        # 7. Calculate Total and apply clustering threshold (Total >= 3)
                         pivot_cluster['Total'] = pivot_cluster.sum(axis=1)
-                        
-                        # 6. Apply the Epidemiological Clustering threshold (Total >= 3)
                         pivot_cluster = pivot_cluster[pivot_cluster['Total'] >= 3].reset_index()
                         
                         if not pivot_cluster.empty:
-                            # 7. Force correct alphabetical sorting including 'Ñ'
+                            # 8. Sort alphabetically and format
                             pivot_cluster['Sort_Key'] = pivot_cluster['Muncity'].str.replace('Ñ', 'N')
                             pivot_cluster = pivot_cluster.sort_values(by=['Sort_Key', 'Barangay']).drop(columns=['Sort_Key'])
                             
-                            # 8. Format column names for presentation
-                            rename_dict = {w: f"MW{w}" for w in latest_weeks}
+                            rename_dict = {w: f"MW{w}" for w in selected_weeks}
                             pivot_cluster = pivot_cluster.rename(columns=rename_dict)
                             pivot_cluster.rename(columns={'Muncity': 'Municipality'}, inplace=True)
                             
-                            # 9. Pure Python/CSS Custom Color (Solid Green for any value > 0)
+                            # 9. Styling
                             def apply_green_color(val):
                                 try:
                                     if int(val) > 0:
@@ -923,7 +931,7 @@ def render_dengue():
                                 except:
                                     return ''
                                     
-                            color_cols = [f"MW{w}" for w in latest_weeks]
+                            color_cols = [f"MW{w}" for w in selected_weeks]
                             
                             # Pandas 2.1+ uses .map() for element-wise styling
                             if hasattr(pivot_cluster.style, 'map'):
@@ -933,11 +941,11 @@ def render_dengue():
                             
                             st.dataframe(styled_df, use_container_width=True, hide_index=True)
                         else:
-                            st.info("No clustering barangays (≥ 3 cases) detected in the last 4 morbidity weeks.")
+                            st.info("No clustering barangays (≥ 3 cases) detected in the selected morbidity weeks.")
                     else:
-                        st.info("No case data available for the latest 4 morbidity weeks.")
+                        st.info("No case data available for the selected morbidity weeks.")
                 else:
-                    st.info("Not enough numeric morbidity week data to calculate clustering.")
+                    st.info("Please select at least one Morbidity Week from the dropdown above.")
             except Exception as e:
                 st.error(f"Error generating clustering table: {e}")
 
