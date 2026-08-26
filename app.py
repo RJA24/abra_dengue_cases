@@ -577,6 +577,19 @@ def render_dengue():
             st.cache_data.clear()
             st.rerun()
 
+        # Add inside the st.sidebar block in render_dengue()
+        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+        if not filtered_df.empty:
+            dengue_csv = filtered_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="Download Filtered Data",
+                data=dengue_csv,
+                file_name=f"Abra_Dengue_Data_{muncity_input.replace(' ', '_')}.csv",
+                mime="text/csv",
+                icon=":material/download:",
+                use_container_width=True
+            )
+
     muncity_filter = df["Muncity"].dropna().unique() if muncity_input == "All Municipalities" else [muncity_input]
     sex_filter = sex_input if sex_input else df["Sex"].dropna().unique()
     clin_filter = clin_input if clin_input else df["ClinClass"].dropna().unique()
@@ -955,7 +968,6 @@ def render_tb():
 
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
         
-        # --- NEW: Municipality Filter for TB ---
         if not df_combined_raw.empty and "Muncity" in df_combined_raw.columns:
             muni_options = ["All Municipalities"] + sorted(df_combined_raw["Muncity"].dropna().unique().tolist())
             muncity_input = st.selectbox("Filter Municipality", options=muni_options, index=0)
@@ -973,6 +985,20 @@ def render_tb():
     else:
         df_combined = df_combined_raw
 
+    # --- NEW: DOWNLOAD BUTTON IN SIDEBAR ---
+    with st.sidebar:
+        if not df_combined.empty:
+            csv_data = df_combined.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="Download Filtered Data",
+                data=csv_data,
+                file_name=f"Abra_TB_Data_{muncity_input.replace(' ', '_')}.csv",
+                mime="text/csv",
+                icon=":material/download:",
+                use_container_width=True
+            )
+    # ---------------------------------------
+
     st.title("Abra PESU: Tuberculosis Control Program")
     st.markdown("---")
 
@@ -982,13 +1008,11 @@ def render_tb():
 
     # 3. Dynamic KPIs
     total_cases = len(df_combined)
-    
     success_count = 0
     if "Outcome/Status" in df_combined.columns:
         success_statuses = ["CURED", "TREATMENT COMPLETED"]
         success_count = len(df_combined[df_combined["Outcome/Status"].str.upper().isin(success_statuses)])
 
-    # Dynamic Geo KPI (Matches Dengue logic)
     ABRA_BRGY_COUNTS = {
         "BANGUED": 31, "BOLINEY": 8, "BUCAY": 21, "BUCLOC": 4, "DAGUIOMAN": 4, 
         "DANGLAS": 7, "DOLORES": 15, "LA PAZ": 12, "LACUB": 6, "LAGANGILANG": 17, 
@@ -1021,7 +1045,6 @@ def render_tb():
     with col3: st.markdown(create_kpi_card(geo_kpi_title, geo_kpi_value, "#f59e0b"), unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # 4. Expanded Tabs
     tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "Epidemiological Trends", "Demographics", "Clinical & Outcomes", 
         "Preventive Treatment (TPT)", "TB-HIV Collaboration", "Choropleth Map", "Raw Line List"
@@ -1030,10 +1053,8 @@ def render_tb():
     with tab1:
         st.subheader("TB Case Detection Trends")
         if "Date of Diagnosis" in df_combined.columns:
-            # Convert to datetime and extract Month-Year
             df_combined['Diag_Date'] = pd.to_datetime(df_combined['Date of Diagnosis'], errors='coerce')
             df_combined['Month_Year'] = df_combined['Diag_Date'].dt.to_period('M').astype(str)
-            
             trend_df = df_combined.dropna(subset=['Month_Year']).groupby('Month_Year').size().reset_index(name='Cases')
             trend_df = trend_df.sort_values('Month_Year')
             
@@ -1096,6 +1117,26 @@ def render_tb():
                 reg_counts.columns = ["Registration Group", "Count"]
                 fig_pie_reg = px.pie(reg_counts, names="Registration Group", values="Count", hole=0.45, title="Patient Registration Group")
                 st.plotly_chart(fig_pie_reg, use_container_width=True)
+
+        # --- NEW CHARTS FOR SOURCE & SITE ---
+        c_source, c_site = st.columns(2)
+        with c_source:
+            if "Source of Patient" in df_combined.columns:
+                src_counts = df_combined["Source of Patient"].fillna("Unknown").value_counts().reset_index()
+                src_counts.columns = ["Source", "Count"]
+                fig_src = px.bar(src_counts, x="Count", y="Source", orientation='h', title="Referral Source")
+                fig_src.update_traces(marker_color='#f59e0b')
+                fig_src.update_layout(yaxis={'categoryorder':'total ascending'})
+                st.plotly_chart(fig_src, use_container_width=True)
+
+        with c_site:
+            if "Anatomical Site" in df_combined.columns:
+                site_counts = df_combined["Anatomical Site"].fillna("Unknown").value_counts().reset_index()
+                site_counts.columns = ["Site", "Count"]
+                fig_site = px.pie(site_counts, names="Site", values="Count", hole=0.45, title="Anatomical Site (P vs. EP)")
+                fig_site.update_traces(marker_colors=['#0ea5e9', '#8b5cf6'])
+                st.plotly_chart(fig_site, use_container_width=True)
+        # ------------------------------------
 
         if "Bacteriologic Status" in df_combined.columns:
             bac_counts = df_combined["Bacteriologic Status"].fillna("Unknown").value_counts().reset_index()
@@ -1229,7 +1270,7 @@ def render_tb():
                         
                 fig_map = px.choropleth_mapbox(
                     map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
-                    color='Total Cases', hover_name='Muncity', color_continuous_scale="Blues", # Changed to blue for TB
+                    color='Total Cases', hover_name='Muncity', color_continuous_scale="Blues", 
                     mapbox_style=style_map[map_style_choice], zoom=8.8, center={"lat": 17.58, "lon": 120.83}, opacity=0.85
                 )
                 
@@ -1242,9 +1283,24 @@ def render_tb():
             else:
                 st.error("Could not fetch the Abra geographic boundaries.")
 
+    # --- CLEANED UP RAW LINE LIST ---
     with tab7:
-        st.subheader("Unified TB Registry (DSTB & DRTB)")
-        st.dataframe(df_combined, use_container_width=True, hide_index=True, height=600)
+        st.subheader("Filtered TB Registry")
+        st.caption("Showing key programmatic columns. Use the Download button in the sidebar for the full dataset.")
+        
+        # Define the exact columns we want to show, in a clean order
+        clean_cols = [
+            "TB/TPT Case No.", "First Name", "Last Name", "Age", "Sex", 
+            "Brgy", "Muncity", "Bacteriologic Status", "Outcome/Status", "Date Started Tx"
+        ]
+        
+        # Only display columns that actually exist in the dataframe to prevent errors
+        available_cols = [col for col in clean_cols if col in df_combined.columns]
+        
+        if available_cols:
+            st.dataframe(df_combined[available_cols], use_container_width=True, hide_index=True, height=600)
+        else:
+            st.dataframe(df_combined, use_container_width=True, hide_index=True, height=600)
 
 def main():
     if not st.session_state.logged_in:
