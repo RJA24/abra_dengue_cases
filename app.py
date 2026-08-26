@@ -93,13 +93,16 @@ st.markdown("""
     }
     /* ---------------------------------------------------- */
 
-    /* Giant Program Buttons styling */
+    /* Glassmorphism Giant Program Buttons styling */
     div.element-container:has(.big-btn-marker) + div.element-container button {
-        height: 140px !important;
-        border-radius: 12px !important;
-        border: 1px solid #cbd5e1 !important;
-        background-color: #ffffff !important;
-        transition: all 0.2s ease-in-out !important;
+        height: 110px !important;
+        border-radius: 55px !important; /* Creates the perfect pill shape */
+        border: 2px solid rgba(255, 255, 255, 0.5) !important; /* Soft white border */
+        background: rgba(255, 255, 255, 0.35) !important; /* Translucent white fill */
+        backdrop-filter: blur(12px) !important; /* The frosted glass blur effect */
+        -webkit-backdrop-filter: blur(12px) !important;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1) !important;
+        transition: all 0.3s ease-in-out !important;
         justify-content: center !important; 
     }
     div.element-container:has(.big-btn-marker) + div.element-container button div[data-testid="stMarkdownContainer"] {
@@ -107,17 +110,18 @@ st.markdown("""
         text-align: center !important;
     }
     div.element-container:has(.big-btn-marker) + div.element-container button p {
-        font-size: 24px !important;
-        font-weight: 600 !important;
-        color: #0f172a !important;
+        font-size: 22px !important;
+        font-weight: 900 !important;
+        color: #000000 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1.5px !important;
         text-align: center !important;
     }
     div.element-container:has(.big-btn-marker) + div.element-container button:hover {
-        border-color: #2563eb !important;
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15) !important;
-    }
-    div.element-container:has(.big-btn-marker) + div.element-container button:hover p {
-        color: #2563eb !important;
+        border-color: rgba(255, 255, 255, 0.9) !important;
+        background: rgba(255, 255, 255, 0.6) !important;
+        box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.2) !important;
+        transform: translateY(-3px) !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -556,44 +560,61 @@ def render_settings():
                             st.error("Username already taken.")
 
 def render_main_menu():
-    # --- BACKGROUND IMAGE INJECTION ---
+    # --- BACKGROUND IMAGE INJECTION (No White Overlay) ---
     bg_css = """
     <style>
     .stApp {
-        background: linear-gradient(
-            rgba(240, 242, 246, 0.8), 
-            rgba(240, 242, 246, 0.8)
-        ), 
-        url("https://github.com/RJA24/abra_sia_2026/blob/main/Abra%20(2).png?raw=true") !important;
+        background: url("https://github.com/RJA24/abra_sia_2026/blob/main/Abra%20(2).png?raw=true") !important;
         background-size: cover !important;
         background-position: center !important;
         background-attachment: fixed !important;
     }
     header[data-testid="stHeader"] { background: rgba(0,0,0,0) !important; }
+    
+    /* Custom Title Styling with shadow for readability over the background */
+    .main-title {
+        text-align: center; 
+        font-size: 3.2rem; 
+        font-weight: 900;
+        color: #0f172a;
+        margin-top: 10px;
+        margin-bottom: 70px;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        text-shadow: 0px 2px 4px rgba(255,255,255,0.9), 0px 4px 15px rgba(255,255,255,0.7);
+    }
     </style>
     """
     st.markdown(bg_css, unsafe_allow_html=True)
     # ----------------------------------
 
-    st.markdown("<h1 style='text-align: center; font-size: 3rem; margin-bottom: 50px;'>Abra Provincial Epidemiology and Surveillance Unit</h1>", unsafe_allow_html=True)
+    # Inject the PHO Logo centered above the title
+    st.markdown(f"""
+    <div style='text-align: center; margin-bottom: 10px;'>
+        <img src="https://github.com/RJA24/abra_sia_2026/blob/main/PHO%20logo.png?raw=true" width="85" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.3));">
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<h1 class='main-title'>Abra Provincial Epidemiology<br>and Surveillance Unit</h1>", unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns(3, gap="large")
+    # Use spacer columns (the 1s on the ends) to squeeze the buttons inward slightly
+    _, col1, col2, col3, _ = st.columns([1, 4, 4, 4, 1], gap="medium")
     
     with col1:
         st.markdown('<span class="big-btn-marker"></span>', unsafe_allow_html=True)
-        if st.button("Dengue", use_container_width=True):
+        if st.button("DENGUE", use_container_width=True):
             st.session_state.active_program = 'dengue'
             st.rerun()
             
     with col2:
         st.markdown('<span class="big-btn-marker"></span>', unsafe_allow_html=True)
-        if st.button("Tuberculosis", use_container_width=True):
+        if st.button("TUBERCULOSIS", use_container_width=True):
             st.session_state.active_program = 'tb'
             st.rerun()
             
     with col3:
         st.markdown('<span class="big-btn-marker"></span>', unsafe_allow_html=True)
-        if st.button("Nothing to see here for now.", use_container_width=True):
+        if st.button("NEXT PROGRAM", use_container_width=True):
             pass
 
 def render_dengue():
