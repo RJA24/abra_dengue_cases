@@ -1254,6 +1254,23 @@ def render_tb():
         else:
             st.info("No data available to plot the Multi-Year Combo Chart.")
 
+        st.markdown("<hr>", unsafe_allow_html=True)
+        st.subheader(f"Monthly Case Detection ({selected_year})")
+        if "Date of Diagnosis" in df_combined.columns and not df_combined.empty:
+            df_combined['Diag_Date'] = pd.to_datetime(df_combined['Date of Diagnosis'], errors='coerce')
+            df_combined['Month'] = df_combined['Diag_Date'].dt.month
+            month_map = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
+            
+            # Group by Case Type for unified colors
+            monthly_trend = df_combined.dropna(subset=['Month']).groupby(['Month', 'Case_Type']).size().reset_index(name='Cases')
+            monthly_trend['Month Name'] = monthly_trend['Month'].map(month_map)
+            
+            if not monthly_trend.empty:
+                fig_trend = px.bar(monthly_trend, x='Month Name', y='Cases', color='Case_Type', text_auto=True, color_discrete_map=CASE_COLORS)
+                fig_trend.update_layout(height=400, xaxis_title="Month", yaxis_title="Number of Cases")
+                st.plotly_chart(fig_trend, use_container_width=True)
+            else: st.info(f"Insufficient date data for monthly trend analysis in {selected_year}.")
+
     with tab2:
         st.subheader(f"Demographic Distribution ({selected_year})")
         if "Muncity" in df_combined.columns and muncity_input == "All Municipalities":
