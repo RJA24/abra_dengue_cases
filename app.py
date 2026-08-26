@@ -337,6 +337,47 @@ def load_tb_data(sheet_name):
         st.error(f"Error loading {sheet_name}: {e}")
         return pd.DataFrame()
 
+
+@st.cache_data(ttl=600)
+def get_all_core_tb():
+    # Load 2026 Data
+    d26_ds = load_tb_data("2026 DSTB")
+    d26_dr = load_tb_data("2026 DRTB")
+    d26 = pd.concat([d26_ds, d26_dr], ignore_index=True)
+    d26['Year'] = 2026
+    
+    # Load Historical Data (2015-2025)
+    h_ds = load_tb_data("DSTB 2015-2025")
+    h_dr = load_tb_data("DRTB 2015-2025")
+    hist = pd.concat([h_ds, h_dr], ignore_index=True)
+    hist['Year'] = pd.to_numeric(hist['Year'], errors='coerce')
+    
+    # Combine everything into one master dataframe
+    combined = pd.concat([d26, hist], ignore_index=True)
+    return combined
+
+@st.cache_data(ttl=600)
+def get_aux_tb_data(program, selected_year):
+    if program == 'TPT':
+        if selected_year == 2026:
+            df = load_tb_data("2026 TPT")
+            df['Year'] = 2026
+            return df
+        else:
+            df = load_tb_data("TPT 2021-2025")
+            df['Year'] = pd.to_numeric(df['Year'], errors='coerce')
+            return df[df['Year'] == selected_year]
+            
+    elif program == 'HIV':
+        if selected_year == 2026:
+            df = load_tb_data("2026 HIV")
+            df['Year'] = 2026
+            return df
+        else:
+            df = load_tb_data("HIV 2021-2025")
+            df['Year'] = pd.to_numeric(df['Year'], errors='coerce')
+            return df[df['Year'] == selected_year]
+
 @st.cache_data(ttl="24h")
 def fetch_muncity_geojson():
     urls = [
@@ -935,21 +976,8 @@ def render_dengue():
 # ==========================================
 
 def render_tb():
-    # 1. Load data first so we can build dynamic filters
-    dataset_choice = st.session_state.get('tb_dataset_choice', "Active 2026 Data")
-    
-    if dataset_choice == "Active 2026 Data":
-        df_dstb = load_tb_data("2026 DSTB")
-        df_drtb = load_tb_data("2026 DRTB")
-        df_tpt = load_tb_data("2026 TPT")
-        df_hiv = load_tb_data("2026 HIV")
-    else:
-        df_dstb = load_tb_data("DSTB 2015-2025")
-        df_drtb = load_tb_data("DRTB 2015-2025")
-        df_tpt = load_tb_data("TPT 2021-2025")
-        df_hiv = load_tb_data("HIV 2021-2025")
-        
-    df_combined_raw = pd.concat([df_dstb, df_drtb], ignore_index=True)
+    # 1. Load Universal Masterlist Data
+    df_all_raw = get_all_core_tb()
 
     with st.sidebar:
         if st.button("Back to Menu", icon=":material/arrow_back:", use_container_width=True):
@@ -959,20 +987,13 @@ def render_tb():
         st.markdown("<hr style='margin: 15px 0; border: none; border-bottom: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
         st.markdown("<h4 style='color: #0f172a; margin: 0 0 15px 0;'><i class='fa-solid fa-folder-open' style='color: #475569;'></i> TB Controls</h4>", unsafe_allow_html=True)
         
-        new_choice = st.radio(
-            "Select TB Registry:",
-            ["Active 2026 Data", "Historical Data"],
-            index=0 if dataset_choice == "Active 2026 Data" else 1,
-            label_visibility="collapsed"
-        )
-        if new_choice != dataset_choice:
-            st.session_state.tb_dataset_choice = new_choice
-            st.rerun()
+        # --- NEW: Specific Year Selector ---
+        available_years = list(range(2026, 2014, -1))
+        selected_year = st.selectbox("Select Year", options=available_years, index=0)
 
-        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-        
-        if not df_combined_raw.empty and "Muncity" in df_combined_raw.columns:
-            muni_options = ["All Municipalities"] + sorted(df_combined_raw["Muncity"].dropna().unique().tolist())
+        # Municipality Filter
+        if not df_all_raw.empty and "Muncity" in df_all_raw.columns:
+            muni_options = ["All Municipalities"] + sorted(df_all_raw["Muncity"].dropna().unique().tolist())
             muncity_input = st.selectbox("Filter Municipality", options=muni_options, index=0)
         else:
             muncity_input = "All Municipalities"
@@ -982,39 +1003,53 @@ def render_tb():
             st.cache_data.clear()
             st.rerun()
 
-    # 2. Apply Filters
+    # 2. Apply Filters globally for Trends
     if muncity_input != "All Municipalities":
-        df_combined = df_combined_raw[df_combined_raw["Muncity"] == muncity_input]
+        df_all_filtered = df_all_raw[df_all_raw["Muncity"] == muncity_input]
     else:
-        df_combined = df_combined_raw
+        df_all_filtered = df_all_raw
 
-    # --- NEW: DOWNLOAD BUTTON IN SIDEBAR ---
+    # Extract Data for the specifically selected year (and the previous year for YOY math)
+    df_combined = df_all_filtered[df_all_filtered['Year'] == selected_year]
+    df_prev_year = df_all_filtered[df_all_filtered['Year'] == (selected_year - 1)]
+    
+    # Load auxiliary data based on year
+    df_tpt = get_aux_tb_data('TPT', selected_year)
+    df_hiv = get_aux_tb_data('HIV', selected_year)
+
+    # --- DOWNLOAD BUTTON IN SIDEBAR ---
     with st.sidebar:
         if not df_combined.empty:
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
             csv_data = df_combined.to_csv(index=False).encode('utf-8')
             st.download_button(
-                label="Download Filtered Data",
+                label=f"Download {selected_year} Data",
                 data=csv_data,
-                file_name=f"Abra_TB_Data_{muncity_input.replace(' ', '_')}.csv",
+                file_name=f"Abra_TB_Data_{selected_year}_{muncity_input.replace(' ', '_')}.csv",
                 mime="text/csv",
                 icon=":material/download:",
                 use_container_width=True
             )
-    # ---------------------------------------
 
     st.title("Abra PESU: Tuberculosis Control Program")
     st.markdown("---")
 
     if df_combined.empty:
-        st.warning("No case data found for the selected filters.")
-        return
+        st.warning(f"No case data found for {selected_year} in the selected area.")
+    
+    # 3. YOY Metrics (Year Over Year)
+    curr_cases = len(df_combined)
+    prev_cases = len(df_prev_year)
+    case_delta = curr_cases - prev_cases
 
-    # 3. Dynamic KPIs
-    total_cases = len(df_combined)
-    success_count = 0
-    if "Outcome/Status" in df_combined.columns:
-        success_statuses = ["CURED", "TREATMENT COMPLETED"]
-        success_count = len(df_combined[df_combined["Outcome/Status"].str.upper().isin(success_statuses)])
+    def get_success_count(df):
+        if "Outcome/Status" in df.columns:
+            return len(df[df["Outcome/Status"].str.upper().isin(["CURED", "TREATMENT COMPLETED"])])
+        return 0
+
+    curr_success = get_success_count(df_combined)
+    prev_success = get_success_count(df_prev_year)
+    success_delta = curr_success - prev_success
 
     ABRA_BRGY_COUNTS = {
         "BANGUED": 31, "BOLINEY": 8, "BUCAY": 21, "BUCLOC": 4, "DAGUIOMAN": 4, 
@@ -1027,25 +1062,29 @@ def render_tb():
 
     if muncity_input == "All Municipalities":
         geo_kpi_title = "Affected Municipalities"
-        geo_kpi_value = f"{df_combined['Muncity'].nunique()} / 27"
+        curr_geo = df_combined['Muncity'].nunique() if 'Muncity' in df_combined.columns else 0
+        prev_geo = df_prev_year['Muncity'].nunique() if 'Muncity' in df_prev_year.columns else 0
+        geo_delta = curr_geo - prev_geo
+        geo_val = f"{curr_geo} / 27"
     else:
         geo_kpi_title = "Affected Barangays"
-        affected_brgy = df_combined['Brgy'].nunique() if 'Brgy' in df_combined.columns else 0
+        curr_geo = df_combined['Brgy'].nunique() if 'Brgy' in df_combined.columns else 0
+        prev_geo = df_prev_year['Brgy'].nunique() if 'Brgy' in df_prev_year.columns else 0
+        geo_delta = curr_geo - prev_geo
         total_brgy = ABRA_BRGY_COUNTS.get(muncity_input, "?")
-        geo_kpi_value = f"{affected_brgy} / {total_brgy}"
+        geo_val = f"{curr_geo} / {total_brgy}"
 
-    def create_kpi_card(title, value, border_color):
-        return f"""
-        <div style="background-color: #ffffff; padding: 22px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; border-left: 8px solid {border_color}; text-align: center;">
-            <p style="margin: 0; font-size: 1rem; color: #64748b; font-weight: 600; text-transform: uppercase;">{title}</p>
-            <h2 style="margin: 10px 0 0 0; font-size: 2.6rem; color: #0f172a; font-weight: 800;">{value}</h2>
-        </div>
-        """
-
+    # Display YOY Metrics using Streamlit's native component
     col1, col2, col3 = st.columns(3)
-    with col1: st.markdown(create_kpi_card("Total Registered Cases", f"{total_cases:,}", "#2563eb"), unsafe_allow_html=True)
-    with col2: st.markdown(create_kpi_card("Successful Outcomes", f"{success_count:,}", "#10b981"), unsafe_allow_html=True)
-    with col3: st.markdown(create_kpi_card(geo_kpi_title, geo_kpi_value, "#f59e0b"), unsafe_allow_html=True)
+    with col1:
+        # Inverse delta color: Negative delta (fewer cases) is painted Green (Good)
+        st.metric(f"Total Registered Cases ({selected_year})", f"{curr_cases:,}", delta=f"{case_delta} vs {selected_year-1}", delta_color="inverse")
+    with col2:
+        # Normal delta color: Positive delta (more successful outcomes) is painted Green (Good)
+        st.metric(f"Successful Outcomes ({selected_year})", f"{curr_success:,}", delta=f"{success_delta} vs {selected_year-1}", delta_color="normal")
+    with col3:
+        st.metric(geo_kpi_title, geo_val, delta=f"{geo_delta} vs {selected_year-1}", delta_color="inverse")
+    
     st.markdown("<br>", unsafe_allow_html=True)
 
     tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
@@ -1054,23 +1093,43 @@ def render_tb():
     ])
 
     with tab1:
-        st.subheader("TB Case Detection Trends")
-        if "Date of Diagnosis" in df_combined.columns:
-            df_combined['Diag_Date'] = pd.to_datetime(df_combined['Date of Diagnosis'], errors='coerce')
-            df_combined['Month_Year'] = df_combined['Diag_Date'].dt.to_period('M').astype(str)
-            trend_df = df_combined.dropna(subset=['Month_Year']).groupby('Month_Year').size().reset_index(name='Cases')
-            trend_df = trend_df.sort_values('Month_Year')
+        # --- MULTI-YEAR TREND CHART ---
+        st.subheader("Multi-Year Trend Analysis")
+        yearly_trend = df_all_filtered.groupby("Year").size().reset_index(name="Total Cases")
+        if not yearly_trend.empty:
+            fig_yoy = px.line(yearly_trend, x="Year", y="Total Cases", markers=True, title=f"Historical Case Trend (2015-{selected_year})")
+            fig_yoy.update_traces(line_color='#2563eb', marker=dict(size=10))
             
-            if not trend_df.empty:
-                fig_trend = px.line(trend_df, x='Month_Year', y='Cases', markers=True, title="TB Cases by Month of Diagnosis")
-                fig_trend.update_traces(line_color='#d97706', marker=dict(size=10))
-                fig_trend.update_layout(height=500, xaxis_title="Month", yaxis_title="Number of Cases")
+            # Highlight the currently selected year
+            fig_yoy.add_vline(x=selected_year, line_width=2, line_dash="dash", line_color="red", annotation_text=f"{selected_year} Selected")
+            
+            fig_yoy.update_layout(height=400, xaxis=dict(dtick=1))
+            st.plotly_chart(fig_yoy, use_container_width=True)
+
+        st.markdown("<hr>", unsafe_allow_html=True)
+
+        # --- MONTHLY TREND CHART (Selected Year) ---
+        st.subheader(f"Monthly Case Detection ({selected_year})")
+        if "Date of Diagnosis" in df_combined.columns and not df_combined.empty:
+            df_combined['Diag_Date'] = pd.to_datetime(df_combined['Date of Diagnosis'], errors='coerce')
+            df_combined['Month'] = df_combined['Diag_Date'].dt.month
+            
+            # Map numbers to month names
+            month_map = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
+            
+            monthly_trend = df_combined.dropna(subset=['Month']).groupby('Month').size().reset_index(name='Cases')
+            monthly_trend['Month Name'] = monthly_trend['Month'].map(month_map)
+            
+            if not monthly_trend.empty:
+                fig_trend = px.bar(monthly_trend, x='Month Name', y='Cases', text_auto=True, title=f"Cases by Month in {selected_year}")
+                fig_trend.update_traces(marker_color='#d97706')
+                fig_trend.update_layout(height=400, xaxis_title="Month", yaxis_title="Number of Cases")
                 st.plotly_chart(fig_trend, use_container_width=True)
             else:
-                st.info("Insufficient date data for trend analysis.")
+                st.info(f"Insufficient date data for monthly trend analysis in {selected_year}.")
 
     with tab2:
-        st.subheader("Demographic Distribution")
+        st.subheader(f"Demographic Distribution ({selected_year})")
         if "Muncity" in df_combined.columns and muncity_input == "All Municipalities":
             muncity_counts = df_combined["Muncity"].value_counts().reset_index()
             muncity_counts.columns = ["Municipality", "Count"]
@@ -1105,7 +1164,7 @@ def render_tb():
             st.plotly_chart(fig_pyr, use_container_width=True)
             
     with tab3:
-        st.subheader("Clinical & Treatment Outcomes")
+        st.subheader(f"Clinical & Treatment Outcomes ({selected_year})")
         c1, c2 = st.columns(2)
         with c1:
             if "Outcome/Status" in df_combined.columns:
@@ -1121,7 +1180,6 @@ def render_tb():
                 fig_pie_reg = px.pie(reg_counts, names="Registration Group", values="Count", hole=0.45, title="Patient Registration Group")
                 st.plotly_chart(fig_pie_reg, use_container_width=True)
 
-        # --- NEW CHARTS FOR SOURCE & SITE ---
         c_source, c_site = st.columns(2)
         with c_source:
             if "Source of Patient" in df_combined.columns:
@@ -1139,7 +1197,6 @@ def render_tb():
                 fig_site = px.pie(site_counts, names="Site", values="Count", hole=0.45, title="Anatomical Site (P vs. EP)")
                 fig_site.update_traces(marker_colors=['#0ea5e9', '#8b5cf6'])
                 st.plotly_chart(fig_site, use_container_width=True)
-        # ------------------------------------
 
         if "Bacteriologic Status" in df_combined.columns:
             bac_counts = df_combined["Bacteriologic Status"].fillna("Unknown").value_counts().reset_index()
@@ -1149,9 +1206,9 @@ def render_tb():
             st.plotly_chart(fig_bar_bac, use_container_width=True)
 
     with tab4:
-        st.subheader("Preventive Treatment (TPT) Analytics")
+        st.subheader(f"Preventive Treatment (TPT) Analytics ({selected_year})")
         if not df_tpt.empty:
-            st.metric("Total Patients on Preventive Treatment (TPT)", len(df_tpt))
+            st.metric(f"Total Patients on TPT ({selected_year})", len(df_tpt))
             c3, c4 = st.columns(2)
             with c3:
                 if "Indication for TPT" in df_tpt.columns:
@@ -1167,10 +1224,10 @@ def render_tb():
                     fig_reg_tpt.update_traces(marker_color='#8b5cf6')
                     st.plotly_chart(fig_reg_tpt, use_container_width=True)
         else:
-            st.info("No TPT data available for the selected period.")
+            st.info(f"No TPT data available for {selected_year}.")
 
     with tab5:
-        st.subheader("TB-HIV Collaborative Activities")
+        st.subheader(f"TB-HIV Collaborative Activities ({selected_year})")
         if not df_hiv.empty:
             try:
                 col_total_tb = "All Reg Group 15 above TB Cases"
@@ -1200,7 +1257,7 @@ def render_tb():
             except Exception as e:
                 st.error("HIV Data columns do not match the expected ITIS export format.")
         else:
-            st.info("No HIV data available for the selected period.")
+            st.info(f"No HIV data available for {selected_year}.")
 
     with tab6:
         map_style_choice = st.radio("Select Map Theme:", ["Light", "Street", "Satellite", "Dark"], horizontal=True, key="tb_map_theme")
@@ -1208,7 +1265,7 @@ def render_tb():
         label_color = 'white' if map_style_choice in ["Dark", "Satellite"] else 'black'
 
         if muncity_input != "All Municipalities":
-            st.subheader(f"Geographic Heatmap: Barangays in {muncity_input}")
+            st.subheader(f"Geographic Heatmap: Barangays in {muncity_input} ({selected_year})")
             brgy_geojson, err = fetch_barangay_geojson(muncity_input)
             
             if brgy_geojson and "Brgy" in df_combined.columns:
@@ -1253,7 +1310,7 @@ def render_tb():
                 st.error(err if err else "Barangay column (Brgy) missing in data.")
                 
         else:
-            st.subheader("Geographic Heatmap: Municipalities in Abra")
+            st.subheader(f"Geographic Heatmap: Municipalities in Abra ({selected_year})")
             base_df = pd.DataFrame({"Muncity": ALL_ABRA_MUNICIPALITIES, "Base_Cases": 0})
             curr_cases = df_combined.groupby("Muncity").size().reset_index(name="Filtered_Cases")
             map_data = pd.merge(base_df, curr_cases, on="Muncity", how="left")
@@ -1273,7 +1330,7 @@ def render_tb():
                         
                 fig_map = px.choropleth_mapbox(
                     map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
-                    color='Total Cases', hover_name='Muncity', color_continuous_scale="Blues", 
+                    color='Total Cases', hover_name='Muncity', color_continuous_scale="Blues",
                     mapbox_style=style_map[map_style_choice], zoom=8.8, center={"lat": 17.58, "lon": 120.83}, opacity=0.85
                 )
                 
@@ -1286,18 +1343,14 @@ def render_tb():
             else:
                 st.error("Could not fetch the Abra geographic boundaries.")
 
-    # --- CLEANED UP RAW LINE LIST ---
     with tab7:
-        st.subheader("Filtered TB Registry")
+        st.subheader(f"Filtered TB Registry ({selected_year})")
         st.caption("Showing key programmatic columns. Use the Download button in the sidebar for the full dataset.")
         
-        # Define the exact columns we want to show, in a clean order
         clean_cols = [
             "TB/TPT Case No.", "First Name", "Last Name", "Age", "Sex", 
             "Brgy", "Muncity", "Bacteriologic Status", "Outcome/Status", "Date Started Tx"
         ]
-        
-        # Only display columns that actually exist in the dataframe to prevent errors
         available_cols = [col for col in clean_cols if col in df_combined.columns]
         
         if available_cols:
