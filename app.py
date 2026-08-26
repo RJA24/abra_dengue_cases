@@ -282,14 +282,12 @@ def get_muni_name_from_props(props):
             std = clean_muni_name(upper_props[k])
             if std in ALL_ABRA_MUNICIPALITIES: return std
             
-    # Fallback ONLY for exact matches (prevents barangay names from false-triggering)
+    # Safe Fallback: Process all values using our now-perfectly-strict clean_muni_name
     for val in props.values():
-        val_str = str(val).upper()
-        val_alpha = re.sub(r'[^A-Z]', '', unicodedata.normalize('NFKD', val_str).encode('ASCII', 'ignore').decode('utf-8'))
-        for muni in ALL_ABRA_MUNICIPALITIES:
-            muni_alpha = re.sub(r'[^A-Z]', '', muni.replace("Ñ", "N"))
-            if val_alpha == muni_alpha: 
-                return muni
+        std = clean_muni_name(str(val))
+        if std in ALL_ABRA_MUNICIPALITIES: 
+            return std
+            
     return None
 
 def extract_brgy_name(props):
