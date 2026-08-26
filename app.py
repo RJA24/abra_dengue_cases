@@ -898,7 +898,7 @@ def render_dengue():
 
     with tab4:
         map_style_choice = st.radio("Select Map Theme:", ["Light", "Street", "Satellite", "Dark"], horizontal=True, key="dengue_map_theme")
-        style_map = {"Light": "carto-positron", "Street": "open-street-map", "Dark": "carto-darkmatter", "Satellite": "white-bg"}
+        style_map = {"Light": "carto-positron-nolabels", "Street": "open-street-map", "Dark": "carto-darkmatter-nolabels", "Satellite": "white-bg"}
         label_color = 'white' if map_style_choice in ["Dark", "Satellite"] else 'black'
         
         # Dynamically determine the correct column name for Dengue
@@ -951,7 +951,7 @@ def render_dengue():
                             colorscale="Reds",
                             zmin=0, 
                             zmax=safe_max,
-                            marker={"opacity": 0.85}
+                            marker={"opacity": 1.0, "line": {"width": 0.5, "color": "gray"}}
                         ))
                         
                         fig_map.update_layout(
@@ -1008,7 +1008,7 @@ def render_dengue():
                             colorscale="Reds",
                             zmin=0, 
                             zmax=safe_max,
-                            marker={"opacity": 0.85}
+                            marker={"opacity": 1.0, "line": {"width": 0.5, "color": "gray"}}
                         ))
                         
                         fig_map.update_layout(
@@ -1364,7 +1364,7 @@ def render_tb():
 
     with tab6:
         map_style_choice = st.radio("Select Map Theme:", ["Light", "Street", "Satellite", "Dark"], horizontal=True, key="tb_map_theme")
-        style_map = {"Light": "carto-positron", "Street": "open-street-map", "Dark": "carto-darkmatter", "Satellite": "white-bg"}
+        style_map = {"Light": "carto-positron-nolabels", "Street": "open-street-map", "Dark": "carto-darkmatter-nolabels", "Satellite": "white-bg"}
         label_color = 'white' if map_style_choice in ["Dark", "Satellite"] else 'black'
 
         if muncity_input != "All Municipalities":
@@ -1415,7 +1415,7 @@ def render_tb():
                             colorscale="Blues",
                             zmin=0, 
                             zmax=safe_max,
-                            marker={"opacity": 0.85}
+                            marker={"opacity": 1.0, "line": {"width": 0.5, "color": "gray"}}
                         ))
                         
                         fig_map.update_layout(
@@ -1473,7 +1473,7 @@ def render_tb():
                             colorscale="Blues",
                             zmin=0, 
                             zmax=safe_max,
-                            marker={"opacity": 0.85}
+                            marker={"opacity": 1.0, "line": {"width": 0.5, "color": "gray"}}
                         ))
                         
                         fig_map.update_layout(
