@@ -588,10 +588,10 @@ def render_main_menu():
     st.markdown(bg_css, unsafe_allow_html=True)
     # ----------------------------------
 
-    # Inject the PHO Logo centered above the title
+    # Inject the Abra Logo centered above the title
     st.markdown(f"""
     <div style='text-align: center; margin-bottom: 10px;'>
-        <img src="https://github.com/RJA24/abra_sia_2026/blob/main/PHO%20logo.png?raw=true" width="85" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.3));">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/1/1a/Abra_provincial_seal.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail_unscaled&_=20170706162937?raw=true" width="85" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.3));">
     </div>
     """, unsafe_allow_html=True)
 
