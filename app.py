@@ -901,7 +901,7 @@ def render_dengue():
         style_map = {"Light": "carto-positron", "Street": "open-street-map", "Dark": "carto-darkmatter", "Satellite": "white-bg"}
         label_color = 'white' if map_style_choice in ["Dark", "Satellite"] else 'black'
         
-        # Dynamically determine the correct column name for Dengue (Fixes the Brgy vs Barangay mismatch)
+        # Dynamically determine the correct column name for Dengue
         brgy_col = "Barangay" if "Barangay" in filtered_df.columns else ("Brgy" if "Brgy" in filtered_df.columns else None)
         
         if muncity_input != "All Municipalities":
@@ -929,11 +929,9 @@ def render_dengue():
                     cases = match['Total Cases'].values[0] if not match.empty else 0
                     lon, lat = get_polygon_centroid(feat['geometry'])
                     if lon is not None and lat is not None:
-                        # Force standard Python floats to prevent Plotly AttributeErrors
                         lons.append(float(lon)); lats.append(float(lat))
                         texts.append(f"{display_name.title()}<br>{int(cases)}")
                 
-                # Force standard Python floats for the map center
                 cam_lat = float(np.mean(lats)) if lats else 17.58
                 cam_lon = float(np.mean(lons)) if lons else 120.83
                 
@@ -942,18 +940,31 @@ def render_dengue():
                     safe_max = max(1, max_cases)
                     
                     try:
-                        fig_map = px.choropleth_mapbox(
-                            map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
-                            color='Total Cases', hover_name='Barangay_Display', color_continuous_scale="Reds",
-                            range_color=[0, safe_max], 
-                            mapbox_style=style_map[map_style_choice], zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.85
+                        # --- BULLETPROOF GRAPH OBJECTS ENGINE (BARANGAY) ---
+                        fig_map = go.Figure(go.Choroplethmapbox(
+                            geojson=brgy_geojson, 
+                            locations=map_data['Join_Key'], 
+                            featureidkey='properties.Standard_Name', 
+                            z=map_data['Total Cases'], 
+                            text=map_data['Barangay_Display'],
+                            hovertemplate="<b>%{text}</b><br>Total Cases: %{z}<extra></extra>",
+                            colorscale="Reds",
+                            zmin=0, 
+                            zmax=safe_max,
+                            marker={"opacity": 0.85}
+                        ))
+                        
+                        fig_map.update_layout(
+                            mapbox_style=style_map[map_style_choice],
+                            mapbox_zoom=11.5,
+                            mapbox_center={"lat": cam_lat, "lon": cam_lon},
+                            margin={"r":0,"t":20,"l":0,"b":0}
                         )
                         
                         if map_style_choice == "Satellite":
                             fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
                         
                         fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
-                        fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
                         st.plotly_chart(fig_map, use_container_width=True)
                     except Exception as e:
                         st.error(f"Plotly encountered an internal error rendering the Barangay map: {e}")
@@ -978,7 +989,6 @@ def render_dengue():
                     cases = match['Total Cases'].values[0] if not match.empty else 0
                     lon, lat = get_polygon_centroid(feat['geometry'])
                     if lon is not None and lat is not None:
-                        # Force standard Python floats
                         lons.append(float(lon)); lats.append(float(lat))
                         texts.append(f"{std_name.title()}<br>{int(cases)}")
                 
@@ -987,18 +997,31 @@ def render_dengue():
                     safe_max = max(1, max_cases)
                             
                     try:
-                        fig_map = px.choropleth_mapbox(
-                            map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
-                            color='Total Cases', hover_name='Muncity', color_continuous_scale="Reds",
-                            range_color=[0, safe_max], 
-                            mapbox_style=style_map[map_style_choice], zoom=8.8, center={"lat": 17.58, "lon": 120.83}, opacity=0.85
+                        # --- BULLETPROOF GRAPH OBJECTS ENGINE (MUNICIPALITY) ---
+                        fig_map = go.Figure(go.Choroplethmapbox(
+                            geojson=abra_geojson, 
+                            locations=map_data['Muncity'], 
+                            featureidkey='properties.Standard_Name', 
+                            z=map_data['Total Cases'], 
+                            text=map_data['Muncity'],
+                            hovertemplate="<b>%{text}</b><br>Total Cases: %{z}<extra></extra>",
+                            colorscale="Reds",
+                            zmin=0, 
+                            zmax=safe_max,
+                            marker={"opacity": 0.85}
+                        ))
+                        
+                        fig_map.update_layout(
+                            mapbox_style=style_map[map_style_choice],
+                            mapbox_zoom=8.8,
+                            mapbox_center={"lat": 17.58, "lon": 120.83},
+                            margin={"r":0,"t":20,"l":0,"b":0}
                         )
                         
                         if map_style_choice == "Satellite":
                             fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
 
                         fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
-                        fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
                         st.plotly_chart(fig_map, use_container_width=True)
                     except Exception as e:
                         st.error(f"Plotly encountered an internal error rendering the Municipality map: {e}")
