@@ -26,48 +26,15 @@ st.markdown("""
 # --- Clean, Professional CSS tailored to your TOML ---
 st.markdown("""
     <style>
-    /* Hide Deploy button and Toolbar */
-    .stDeployButton, [data-testid="stAppDeployButton"], [data-testid="stToolbar"] { display: none !important; }
+    /* Hide Deploy button */
+    .stDeployButton, [data-testid="stAppDeployButton"] { display: none !important; }
 
-    /* Adjust padding */
-    .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
-    
-    /* Make header transparent */
-    header { background: transparent !important; }
-    
-    /* The Bulletproof Sidebar Toggle Target */
-    button[kind="header"], 
-    button[title="View sidebar"], 
-    [data-testid="collapsedControl"] {
-        background-color: rgba(255, 255, 255, 0.95) !important;
-        border: 1px solid #cbd5e1 !important;
-        border-radius: 8px !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        display: flex !important;
-        z-index: 999999 !important;
-        margin: 15px !important;
-        padding: 5px !important;
-        box-shadow: 0px 4px 6px rgba(0,0,0,0.1) !important;
-    }
-    
-    /* Force the arrow icon to be dark */
-    button[kind="header"] *, 
-    button[title="View sidebar"] *, 
-    [data-testid="collapsedControl"] * {
-        fill: #0f172a !important;
-        color: #0f172a !important;
-    }
-    
-    button[kind="header"]:hover, 
-    button[title="View sidebar"]:hover, 
-    [data-testid="collapsedControl"]:hover {
-        background-color: #f8fafc !important;
-        border-color: #94a3b8 !important;
-    }
+    /* Adjust padding to pull content up slightly, but safely */
+    .block-container { padding-top: 2rem; padding-bottom: 2rem; }
 
     /* Hide standard footer */
-    #MainMenu, footer { visibility: hidden; } 
+    #MainMenu { visibility: hidden; }
+    footer { visibility: hidden; } 
     
     .js-plotly-plot { margin-bottom: 2rem; }
     div.row-widget.stRadio > div { flex-direction: row; align-items: center; justify-content: center; background: #ffffff; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
