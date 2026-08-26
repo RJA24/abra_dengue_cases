@@ -941,7 +941,7 @@ def render_dengue():
                     
                     try:
                         # --- BULLETPROOF GRAPH OBJECTS ENGINE (BARANGAY) ---
-                        fig_map = go.Figure(go.Choroplethmapbox(
+                        fig_map = go.Figure(go.Choroplethmap(
                             geojson=brgy_geojson, 
                             locations=map_data['Join_Key'], 
                             featureidkey='properties.Standard_Name', 
@@ -955,16 +955,16 @@ def render_dengue():
                         ))
                         
                         fig_map.update_layout(
-                            mapbox_style=style_map[map_style_choice],
-                            mapbox_zoom=11.5,
-                            mapbox_center={"lat": cam_lat, "lon": cam_lon},
+                            map_style=style_map[map_style_choice],
+                            map_zoom=11.5,
+                            map_center={"lat": cam_lat, "lon": cam_lon},
                             margin={"r":0,"t":20,"l":0,"b":0}
                         )
                         
                         if map_style_choice == "Satellite":
-                            fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
+                            fig_map.update_layout(map_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
                         
-                        fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
+                        fig_map.add_trace(go.Scattermap(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
                         st.plotly_chart(fig_map, use_container_width=True)
                     except Exception as e:
                         st.error(f"Plotly encountered an internal error rendering the Barangay map: {e}")
@@ -998,7 +998,7 @@ def render_dengue():
                             
                     try:
                         # --- BULLETPROOF GRAPH OBJECTS ENGINE (MUNICIPALITY) ---
-                        fig_map = go.Figure(go.Choroplethmapbox(
+                        fig_map = go.Figure(go.Choroplethmap(
                             geojson=abra_geojson, 
                             locations=map_data['Muncity'], 
                             featureidkey='properties.Standard_Name', 
@@ -1012,16 +1012,16 @@ def render_dengue():
                         ))
                         
                         fig_map.update_layout(
-                            mapbox_style=style_map[map_style_choice],
-                            mapbox_zoom=8.8,
-                            mapbox_center={"lat": 17.58, "lon": 120.83},
+                            map_style=style_map[map_style_choice],
+                            map_zoom=8.8,
+                            map_center={"lat": 17.58, "lon": 120.83},
                             margin={"r":0,"t":20,"l":0,"b":0}
                         )
                         
                         if map_style_choice == "Satellite":
-                            fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
+                            fig_map.update_layout(map_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
 
-                        fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
+                        fig_map.add_trace(go.Scattermap(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
                         st.plotly_chart(fig_map, use_container_width=True)
                     except Exception as e:
                         st.error(f"Plotly encountered an internal error rendering the Municipality map: {e}")
@@ -1405,7 +1405,7 @@ def render_tb():
                     
                     try:
                         # --- BULLETPROOF GRAPH OBJECTS ENGINE (BARANGAY) ---
-                        fig_map = go.Figure(go.Choroplethmapbox(
+                        fig_map = go.Figure(go.Choroplethmap(
                             geojson=brgy_geojson, 
                             locations=map_data['Join_Key'], 
                             featureidkey='properties.Standard_Name', 
@@ -1419,16 +1419,16 @@ def render_tb():
                         ))
                         
                         fig_map.update_layout(
-                            mapbox_style=style_map[map_style_choice],
-                            mapbox_zoom=11.5,
-                            mapbox_center={"lat": cam_lat, "lon": cam_lon},
+                            map_style=style_map[map_style_choice],
+                            map_zoom=11.5,
+                            map_center={"lat": cam_lat, "lon": cam_lon},
                             margin={"r":0,"t":20,"l":0,"b":0}
                         )
                         
                         if map_style_choice == "Satellite":
-                            fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
+                            fig_map.update_layout(map_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
                         
-                        fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
+                        fig_map.add_trace(go.Scattermap(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
                         st.plotly_chart(fig_map, use_container_width=True)
                     except Exception as e:
                         st.error(f"Plotly encountered an internal error rendering the Barangay map: {e}")
@@ -1463,7 +1463,7 @@ def render_tb():
                             
                     try:
                         # --- BULLETPROOF GRAPH OBJECTS ENGINE (MUNICIPALITY) ---
-                        fig_map = go.Figure(go.Choroplethmapbox(
+                        fig_map = go.Figure(go.Choroplethmap(
                             geojson=abra_geojson, 
                             locations=map_data['Muncity'], 
                             featureidkey='properties.Standard_Name', 
@@ -1477,16 +1477,16 @@ def render_tb():
                         ))
                         
                         fig_map.update_layout(
-                            mapbox_style=style_map[map_style_choice],
-                            mapbox_zoom=8.8,
-                            mapbox_center={"lat": 17.58, "lon": 120.83},
+                            map_style=style_map[map_style_choice],
+                            map_zoom=8.8,
+                            map_center={"lat": 17.58, "lon": 120.83},
                             margin={"r":0,"t":20,"l":0,"b":0}
                         )
                         
                         if map_style_choice == "Satellite":
-                            fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
+                            fig_map.update_layout(map_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
 
-                        fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
+                        fig_map.add_trace(go.Scattermap(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
                         st.plotly_chart(fig_map, use_container_width=True)
                     except Exception as e:
                         st.error(f"Plotly encountered an internal error rendering the Municipality map: {e}")
