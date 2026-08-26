@@ -530,7 +530,7 @@ def render_admin_panel():
         
         # Exact report mapping to your Google Sheet tab names
         report_mapping = {
-            "Dengue Cases": "Sheet1",
+            "Dengue Cases": "Dengue Cases",
             "2026 MN": "2026 MN",
             "DSTB": "2026 DSTB",
             "DRTB": "2026 DRTB",
