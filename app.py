@@ -958,7 +958,7 @@ def render_dengue():
                             map_style=style_map[map_style_choice],
                             map_zoom=11.5,
                             map_center={"lat": cam_lat, "lon": cam_lon},
-                            margin={"r":0,"t":20,"l":0,"b":0}
+                            margin={"r":0,"t":20,"l":0,"b":0}, height=850
                         )
                         
                         if map_style_choice == "Satellite":
@@ -1015,7 +1015,7 @@ def render_dengue():
                             map_style=style_map[map_style_choice],
                             map_zoom=8.8,
                             map_center={"lat": 17.58, "lon": 120.83},
-                            margin={"r":0,"t":20,"l":0,"b":0}
+                            margin={"r":0,"t":20,"l":0,"b":0}, height=850
                         )
                         
                         if map_style_choice == "Satellite":
@@ -1422,7 +1422,7 @@ def render_tb():
                             map_style=style_map[map_style_choice],
                             map_zoom=11.5,
                             map_center={"lat": cam_lat, "lon": cam_lon},
-                            margin={"r":0,"t":20,"l":0,"b":0}
+                            margin={"r":0,"t":20,"l":0,"b":0}, height=850
                         )
                         
                         if map_style_choice == "Satellite":
@@ -1480,7 +1480,7 @@ def render_tb():
                             map_style=style_map[map_style_choice],
                             map_zoom=8.8,
                             map_center={"lat": 17.58, "lon": 120.83},
-                            margin={"r":0,"t":20,"l":0,"b":0}
+                            margin={"r":0,"t":20,"l":0,"b":0}, height=850
                         )
                         
                         if map_style_choice == "Satellite":
