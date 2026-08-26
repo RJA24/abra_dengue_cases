@@ -240,7 +240,13 @@ ALL_ABRA_MUNICIPALITIES = [
 def clean_muni_name(raw_name):
     if not isinstance(raw_name, str): return ""
     raw = str(raw_name).upper()
+    
+    # NEW: Intercept Excel's broken 'Ñ' encoding glitch and standard 'Ñ's
+    raw = raw.replace("Ã‘", "N").replace("Ñ", "N")
+    
     raw = unicodedata.normalize('NFKD', raw).encode('ASCII', 'ignore').decode('utf-8')
+    raw = raw.replace("(CAPITAL)", "").replace("CAPITAL", "").strip()
+    
     raw_alpha = re.sub(r'[^A-Z]', '', raw)
     
     # 1. Exact Match Check (Safest)
@@ -248,9 +254,9 @@ def clean_muni_name(raw_name):
         if raw_alpha == re.sub(r'[^A-Z]', '', muni.replace("Ñ", "N")):
             return muni
             
-    # 2. Strict Aliases
+    # 2. Strict Aliases (Added 'PEAARRUBIA' as a failsafe)
     if raw_alpha in ["LICUANBAAY", "LICUAN", "BAAY"]: return "LICUAN-BAAY"
-    if raw_alpha in ["PENARRUBIA", "PENARUBIA", "PENAR", "RUBIA"]: return "PEÑARRUBIA"
+    if raw_alpha in ["PENARRUBIA", "PENARUBIA", "PEAARRUBIA", "PENAR", "RUBIA", "PEÃ‘ARRUBIA"]: return "PEÑARRUBIA"
     if raw_alpha in ["LAPAZ", "PAZ"]: return "LA PAZ"
     if raw_alpha in ["SANJUAN", "JUAN"]: return "SAN JUAN"
     if raw_alpha in ["SANISIDRO", "ISIDRO"]: return "SAN ISIDRO"
