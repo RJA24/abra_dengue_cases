@@ -484,57 +484,102 @@ def render_register():
 
 def render_admin_panel():
     st.markdown("### <i class='fa-solid fa-screwdriver-wrench' style='color: #475569;'></i> Admin Control Panel", unsafe_allow_html=True)
-    st.caption("Manage user access and edit roles.")
     
-    try:
-        users_df = get_all_users()
-        
-        if not users_df.empty:
-            for index, row in users_df.iterrows():
-                with st.container():
-                    col_user, col_role, col_actions = st.columns([2, 2, 3])
-                    
-                    with col_user:
-                        st.write(f"**{row['username']}**")
-                        if row['status'] == 'pending':
-                            st.warning("PENDING")
-                        else:
-                            st.success("APPROVED")
-                            
-                    with col_role:
-                        role_options = ["user", "admin"]
-                        current_idx = role_options.index(row['role']) if row['role'] in role_options else 0
-                        
-                        selected_role = st.selectbox(
-                            "Role Assignment", 
-                            options=role_options, 
-                            index=current_idx, 
-                            key=f"role_{row['username']}",
-                            label_visibility="collapsed"
-                        )
-                        
-                        if selected_role != row['role']:
-                            if st.button("Save New Role", key=f"save_role_{row['username']}"):
-                                update_user_role(row['username'], selected_role)
-                                st.rerun()
-
-                    with col_actions:
-                        c1, c2 = st.columns(2)
-                        with c1:
-                            if row['status'] == 'pending':
-                                if st.button("Approve", key=f"app_{row['username']}", use_container_width=True):
-                                    update_user_status(row['username'], 'approved')
+    tab_users, tab_db = st.tabs(["User Management", "Database Uploader"])
+    
+    with tab_users:
+        st.caption("Manage user access and edit roles.")
+        try:
+            users_df = get_all_users()
+            if not users_df.empty:
+                for index, row in users_df.iterrows():
+                    with st.container():
+                        col_user, col_role, col_actions = st.columns([2, 2, 3])
+                        with col_user:
+                            st.write(f"**{row['username']}**")
+                            if row['status'] == 'pending': st.warning("PENDING")
+                            else: st.success("APPROVED")
+                        with col_role:
+                            role_options = ["user", "admin"]
+                            current_idx = role_options.index(row['role']) if row['role'] in role_options else 0
+                            selected_role = st.selectbox("Role Assignment", options=role_options, index=current_idx, key=f"role_{row['username']}", label_visibility="collapsed")
+                            if selected_role != row['role']:
+                                if st.button("Save New Role", key=f"save_role_{row['username']}"):
                                     update_user_role(row['username'], selected_role)
                                     st.rerun()
-                        with c2:
-                            if st.button("Delete User", key=f"del_{row['username']}", use_container_width=True):
-                                delete_user(row['username'])
-                                st.rerun()
-                    st.markdown("---")
-        else:
-            st.info("No other users found in the database.")
-    except Exception as e:
-        st.error("Could not load users. Please check your Google Service Account configuration.")
+                        with col_actions:
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                if row['status'] == 'pending':
+                                    if st.button("Approve", key=f"app_{row['username']}", use_container_width=True):
+                                        update_user_status(row['username'], 'approved')
+                                        update_user_role(row['username'], selected_role)
+                                        st.rerun()
+                            with c2:
+                                if st.button("Delete User", key=f"del_{row['username']}", use_container_width=True):
+                                    delete_user(row['username'])
+                                    st.rerun()
+                        st.markdown("---")
+            else:
+                st.info("No other users found in the database.")
+        except Exception as e:
+            st.error("Could not load users. Please check your Google Service Account configuration.")
+
+    with tab_db:
+        st.caption("Upload cumulative 2026 export files to overwrite and update the master Google Sheets. Historical data (2015–2025) is excluded and protected.")
+        
+        # Exact report mapping to your Google Sheet tab names
+        report_mapping = {
+            "Dengue Cases": "Sheet1",
+            "2026 MN": "2026 MN",
+            "DSTB": "2026 DSTB",
+            "DRTB": "2026 DRTB",
+            "TPT": "2026 TPT",
+            "HIV": "2026 HIV",
+            "2026 Report 5": "2026 Report 5"
+        }
+        
+        selected_report = st.selectbox("1. Select Report to Update", options=list(report_mapping.keys()))
+        target_worksheet = report_mapping[selected_report]
+        
+        st.info(f"Target Google Sheet Tab: **{target_worksheet}**")
+        
+        uploaded_file = st.file_uploader("2. Upload Cumulative Export File (.csv or .xlsx)", type=['csv', 'xlsx'])
+        
+        if uploaded_file is not None:
+            # Quick preview to verify data before uploading
+            try:
+                if uploaded_file.name.endswith('.csv'):
+                    preview_df = pd.read_csv(uploaded_file)
+                else:
+                    preview_df = pd.read_excel(uploaded_file)
+                
+                st.write(f"📁 **File Preview:** {len(preview_df):,} rows found.")
+                with st.expander("View first few rows"):
+                    st.dataframe(preview_df.head(3), use_container_width=True)
+                
+                if st.button("Clear Old Data & Upload New Records", type="primary", use_container_width=True):
+                    with st.spinner(f"Updating '{target_worksheet}' in Google Sheets..."):
+                        try:
+                            conn = st.connection("gsheets", type=GSheetsConnection)
+                            
+                            # Safely clear old data first
+                            try:
+                                conn.clear(spreadsheet=SHEET_URL, worksheet=target_worksheet)
+                            except:
+                                pass
+                                
+                            # Push new cumulative dataset
+                            conn.update(spreadsheet=SHEET_URL, worksheet=target_worksheet, data=preview_df)
+                            
+                            # Nuke app cache so dashboards instantly reflect the new data
+                            st.cache_data.clear()
+                            
+                            st.success(f"✅ Successfully replaced data in '{target_worksheet}' with {len(preview_df):,} records!")
+                        except Exception as e:
+                            st.error(f"Error updating Google Sheet: {e}")
+            except Exception as e:
+                st.error(f"Could not read the uploaded file: {e}")
 
 def render_settings():
     st.markdown("### <i class='fa-solid fa-gear' style='color: #475569;'></i> Account Settings", unsafe_allow_html=True)
