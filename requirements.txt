@@ -3,3 +3,4 @@ pandas
 plotly>=5.20.0
 requests
 st-gsheets-connection
+openpyxl
