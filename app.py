@@ -26,40 +26,48 @@ st.markdown("""
 # --- Clean, Professional CSS tailored to your TOML ---
 st.markdown("""
     <style>
-    /* Hide the Streamlit 'Manage app' button and developer toolbar */
-    .stDeployButton, [data-testid="stAppDeployButton"] { display: none !important; }
-    [data-testid="stToolbar"] { display: none !important; }
+    /* Hide Deploy button and Toolbar */
+    .stDeployButton, [data-testid="stAppDeployButton"], [data-testid="stToolbar"] { display: none !important; }
 
-    /* Adjust top padding to pull title higher */
+    /* Adjust padding */
     .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
     
-    /* --- BULLETPROOF HEADER & SIDEBAR TOGGLE --- */
-    /* 1. Make the header transparent */
-    header[data-testid="stHeader"] { 
-        background: transparent !important; 
-    }
+    /* Make header transparent */
+    header { background: transparent !important; }
     
-    /* 2. Target ANY button inside the header (Catches the sidebar toggle universally) */
-    header[data-testid="stHeader"] button {
-        background-color: rgba(255, 255, 255, 0.9) !important;
+    /* The Bulletproof Sidebar Toggle Target */
+    button[kind="header"], 
+    button[title="View sidebar"], 
+    [data-testid="collapsedControl"] {
+        background-color: rgba(255, 255, 255, 0.95) !important;
         border: 1px solid #cbd5e1 !important;
         border-radius: 8px !important;
-        box-shadow: 0px 4px 6px rgba(0,0,0,0.2) !important;
-        margin: 10px !important;
         visibility: visible !important;
+        opacity: 1 !important;
         display: flex !important;
+        z-index: 999999 !important;
+        margin: 15px !important;
+        padding: 5px !important;
+        box-shadow: 0px 4px 6px rgba(0,0,0,0.1) !important;
     }
     
-    /* 3. Force the SVG arrow icon inside the button to be dark */
-    header[data-testid="stHeader"] button svg {
+    /* Force the arrow icon to be dark */
+    button[kind="header"] *, 
+    button[title="View sidebar"] *, 
+    [data-testid="collapsedControl"] * {
         fill: #0f172a !important;
         color: #0f172a !important;
     }
-    /* ------------------------------------------- */
+    
+    button[kind="header"]:hover, 
+    button[title="View sidebar"]:hover, 
+    [data-testid="collapsedControl"]:hover {
+        background-color: #f8fafc !important;
+        border-color: #94a3b8 !important;
+    }
 
-    /* Hide default footer */
-    #MainMenu {visibility: hidden;} 
-    footer {visibility: hidden;} 
+    /* Hide standard footer */
+    #MainMenu, footer { visibility: hidden; } 
     
     .js-plotly-plot { margin-bottom: 2rem; }
     div.row-widget.stRadio > div { flex-direction: row; align-items: center; justify-content: center; background: #ffffff; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
