@@ -937,20 +937,26 @@ def render_dengue():
                 cam_lat = np.mean(lats) if lats else 17.58
                 cam_lon = np.mean(lons) if lons else 120.83
                 
-                fig_map = px.choropleth_mapbox(
-                    map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
-                    color='Total Cases', hover_name='Barangay_Display', color_continuous_scale="Reds",
-                    mapbox_style=style_map[map_style_choice], zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.85
-                )
-                
-                if map_style_choice == "Satellite":
-                    fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
-                
-                fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
-                fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
-                st.plotly_chart(fig_map, use_container_width=True)
-            else:
-                st.error(err if err else "Barangay column missing in data.")
+                # --- BULLETPROOF SAFETY CHECK (DENGUE BARANGAY) ---
+                if not map_data.empty and "Total Cases" in map_data.columns:
+                    max_cases = int(map_data["Total Cases"].max())
+                    safe_max = max(1, max_cases)
+                    
+                    fig_map = px.choropleth_mapbox(
+                        map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
+                        color='Total Cases', hover_name='Barangay_Display', color_continuous_scale="Reds",
+                        range_color=[0, safe_max], # Prevent divide-by-zero crash
+                        mapbox_style=style_map[map_style_choice], zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.85
+                    )
+                    
+                    if map_style_choice == "Satellite":
+                        fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
+                    
+                    fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
+                    fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
+                    st.plotly_chart(fig_map, use_container_width=True)
+                else:
+                    st.warning("No geographic mapping data available for the selected filters.")
                 
         else:
             st.subheader("Geographic Heatmap: Municipalities in Abra")
@@ -971,20 +977,26 @@ def render_dengue():
                         lons.append(lon); lats.append(lat)
                         texts.append(f"{std_name.title()}<br>{int(cases)}")
                         
-                fig_map = px.choropleth_mapbox(
-                    map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
-                    color='Total Cases', hover_name='Muncity', color_continuous_scale="Reds",
-                    mapbox_style=style_map[map_style_choice], zoom=8.8, center={"lat": 17.58, "lon": 120.83}, opacity=0.85
-                )
-                
-                if map_style_choice == "Satellite":
-                    fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
+                # --- BULLETPROOF SAFETY CHECK (DENGUE MUNICIPALITY) ---
+                if not map_data.empty and "Total Cases" in map_data.columns:
+                    max_cases = int(map_data["Total Cases"].max())
+                    safe_max = max(1, max_cases)
+                            
+                    fig_map = px.choropleth_mapbox(
+                        map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
+                        color='Total Cases', hover_name='Muncity', color_continuous_scale="Reds",
+                        range_color=[0, safe_max], # Prevent divide-by-zero crash
+                        mapbox_style=style_map[map_style_choice], zoom=8.8, center={"lat": 17.58, "lon": 120.83}, opacity=0.85
+                    )
+                    
+                    if map_style_choice == "Satellite":
+                        fig_map.update_layout(mapbox_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
 
-                fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
-                fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
-                st.plotly_chart(fig_map, use_container_width=True)
-            else:
-                st.error("Could not fetch the Abra geographic boundaries.")
+                    fig_map.add_trace(go.Scattermapbox(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
+                    fig_map.update_layout(margin={"r":0,"t":20,"l":0,"b":0}, height=700)
+                    st.plotly_chart(fig_map, use_container_width=True)
+                else:
+                    st.warning("No geographic mapping data available for the selected filters.")
 
     with tab5:
         st.subheader("Surveillance Line List")
