@@ -1062,8 +1062,19 @@ def render_tb():
 
     if muncity_input == "All Municipalities":
         geo_kpi_title = "Affected Municipalities"
-        curr_geo = df_combined['Muncity'].nunique() if 'Muncity' in df_combined.columns else 0
-        prev_geo = df_prev_year['Muncity'].nunique() if 'Muncity' in df_prev_year.columns else 0
+        # STRICT FILTER: Only count valid Abra municipalities (fixes the 28/27 bug)
+        if 'Muncity' in df_combined.columns:
+            valid_curr = df_combined[df_combined['Muncity'].isin(ALL_ABRA_MUNICIPALITIES)]
+            curr_geo = valid_curr['Muncity'].nunique()
+        else:
+            curr_geo = 0
+            
+        if 'Muncity' in df_prev_year.columns:
+            valid_prev = df_prev_year[df_prev_year['Muncity'].isin(ALL_ABRA_MUNICIPALITIES)]
+            prev_geo = valid_prev['Muncity'].nunique()
+        else:
+            prev_geo = 0
+            
         geo_delta = curr_geo - prev_geo
         geo_val = f"{curr_geo} / 27"
     else:
@@ -1074,16 +1085,42 @@ def render_tb():
         total_brgy = ABRA_BRGY_COUNTS.get(muncity_input, "?")
         geo_val = f"{curr_geo} / {total_brgy}"
 
-    # Display YOY Metrics using Streamlit's native component
+    # --- UPGRADED PREMIUM HTML CARDS WITH YOY DELTAS ---
+    def create_yoy_card(title, value, border_color, delta_val, inverse_color=False):
+        # Determine arrow and colors based on whether high/low is good/bad
+        if delta_val > 0:
+            arrow = "↑"
+            text_color = "#dc2626" if inverse_color else "#16a34a" # Red if inverse (bad), Green if normal (good)
+            bg_color = "#fee2e2" if inverse_color else "#dcfce3"
+        elif delta_val < 0:
+            arrow = "↓"
+            text_color = "#16a34a" if inverse_color else "#dc2626" # Green if inverse (good), Red if normal (bad)
+            bg_color = "#dcfce3" if inverse_color else "#fee2e2"
+        else:
+            arrow = "→"
+            text_color = "#64748b"
+            bg_color = "#f1f5f9"
+            
+        return f"""
+        <div style="background-color: #ffffff; padding: 22px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; border-left: 8px solid {border_color}; text-align: center;">
+            <p style="margin: 0; font-size: 1rem; color: #64748b; font-weight: 600; text-transform: uppercase;">{title}</p>
+            <h2 style="margin: 10px 0 10px 0; font-size: 2.6rem; color: #0f172a; font-weight: 800;">{value}</h2>
+            <span style="color: {text_color}; font-size: 0.85rem; font-weight: 700; background-color: {bg_color}; padding: 4px 10px; border-radius: 20px;">
+                {arrow} {abs(delta_val)} vs prev year
+            </span>
+        </div>
+        """
+
     col1, col2, col3 = st.columns(3)
-    with col1:
-        # Inverse delta color: Negative delta (fewer cases) is painted Green (Good)
-        st.metric(f"Total Registered Cases ({selected_year})", f"{curr_cases:,}", delta=f"{case_delta} vs {selected_year-1}", delta_color="inverse")
-    with col2:
-        # Normal delta color: Positive delta (more successful outcomes) is painted Green (Good)
-        st.metric(f"Successful Outcomes ({selected_year})", f"{curr_success:,}", delta=f"{success_delta} vs {selected_year-1}", delta_color="normal")
-    with col3:
-        st.metric(geo_kpi_title, geo_val, delta=f"{geo_delta} vs {selected_year-1}", delta_color="inverse")
+    with col1: 
+        # Inverse: Fewer cases = Good (Green)
+        st.markdown(create_yoy_card(f"Total Cases ({selected_year})", f"{curr_cases:,}", "#2563eb", case_delta, inverse_color=True), unsafe_allow_html=True)
+    with col2: 
+        # Normal: More successes = Good (Green)
+        st.markdown(create_yoy_card(f"Successful Outcomes", f"{curr_success:,}", "#10b981", success_delta, inverse_color=False), unsafe_allow_html=True)
+    with col3: 
+        # Inverse: Fewer affected areas = Good (Green)
+        st.markdown(create_yoy_card(geo_kpi_title, geo_val, "#f59e0b", geo_delta, inverse_color=True), unsafe_allow_html=True)
     
     st.markdown("<br>", unsafe_allow_html=True)
 
