@@ -1216,12 +1216,20 @@ def render_tb():
         st.subheader("TB All Forms and TPT Enrollment (2021-2026)")
         
         combo_tb = df_all_raw[(df_all_raw['Year'] >= 2021) & (df_all_raw['Case_Type'] == 'DSTB')].copy()
+        
+        # --- FIX: Bulletproof Bacteriologic Status Matching ---
         if 'Bacteriologic Status' in combo_tb.columns:
-            combo_tb['Bac_Clean'] = combo_tb['Bacteriologic Status'].fillna('Unknown').astype(str).str.upper()
-            bc_counts = combo_tb[combo_tb['Bac_Clean'].str.contains('BACTERIOLOGICALLY CONFIRMED|BC')].groupby('Year').size()
-            cd_counts = combo_tb[combo_tb['Bac_Clean'].str.contains('CLINICALLY DIAGNOSED|CD')].groupby('Year').size()
+            combo_tb['Bac_Clean'] = combo_tb['Bacteriologic Status'].fillna('UNKNOWN').astype(str).str.upper()
+            
+            # Widen the search net to catch 'BACTERIOLOGICAL', 'BACTERIOLOGICALLY', 'CLINICAL', 'CLINICALLY', etc.
+            bc_mask = combo_tb['Bac_Clean'].str.contains('BACTERIOLOGIC|BC', regex=True)
+            cd_mask = combo_tb['Bac_Clean'].str.contains('CLINICAL|CD', regex=True)
+            
+            bc_counts = combo_tb[bc_mask].groupby('Year').size()
+            cd_counts = combo_tb[cd_mask].groupby('Year').size()
         else:
             bc_counts, cd_counts = pd.Series(dtype=int), pd.Series(dtype=int)
+            st.warning("Could not locate 'Bacteriologic Status' column in DSTB data.")
             
         tpt_all = get_all_tpt_data()
         if not tpt_all.empty: tpt_counts = tpt_all[tpt_all['Year'] >= 2021].groupby('Year').size()
@@ -1236,29 +1244,15 @@ def render_tb():
             y_cd = [cd_counts.get(y, 0) for y in combo_years]
             y_tpt = [tpt_counts.get(y, 0) for y in combo_years]
             
+            # Add traces
             fig_combo.add_trace(go.Bar(x=combo_years, y=y_bc, name="BC", marker_color="#ff0000", text=y_bc, textposition="inside", textfont=dict(color="white")))
             fig_combo.add_trace(go.Bar(x=combo_years, y=y_cd, name="CD", marker_color="#b2d89b", text=y_cd, textposition="inside", textfont=dict(color="black")))
-            fig_combo.add_trace(go.Scatter(x=combo_years, y=y_tpt, name="TPT", mode="lines+markers+text", marker_color="#3b82f6", line=dict(width=3), marker=dict(size=8), text=y_tpt, textposition="middle right", textfont=dict(color="#3b82f6", size=14, family="Arial Black")))
+            fig_combo.add_trace(go.Scatter(x=combo_years, y=y_tpt, name="TPT", mode="lines+markers+text", marker_color="#3b82f6", line=dict(width=3), marker=dict(size=8), text=y_tpt, textposition="top center", textfont=dict(color="#3b82f6", size=14, family="Arial Black")))
             
             fig_combo.update_layout(barmode='stack', height=500, xaxis=dict(tickmode='array', tickvals=combo_years), legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5))
             st.plotly_chart(fig_combo, use_container_width=True)
-
-        st.markdown("<hr>", unsafe_allow_html=True)
-        st.subheader(f"Monthly Case Detection ({selected_year})")
-        if "Date of Diagnosis" in df_combined.columns and not df_combined.empty:
-            df_combined['Diag_Date'] = pd.to_datetime(df_combined['Date of Diagnosis'], errors='coerce')
-            df_combined['Month'] = df_combined['Diag_Date'].dt.month
-            month_map = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
-            
-            # Group by Case Type for unified colors
-            monthly_trend = df_combined.dropna(subset=['Month']).groupby(['Month', 'Case_Type']).size().reset_index(name='Cases')
-            monthly_trend['Month Name'] = monthly_trend['Month'].map(month_map)
-            
-            if not monthly_trend.empty:
-                fig_trend = px.bar(monthly_trend, x='Month Name', y='Cases', color='Case_Type', text_auto=True, color_discrete_map=CASE_COLORS)
-                fig_trend.update_layout(height=400, xaxis_title="Month", yaxis_title="Number of Cases")
-                st.plotly_chart(fig_trend, use_container_width=True)
-            else: st.info(f"Insufficient date data for monthly trend analysis in {selected_year}.")
+        else:
+            st.info("No data available to plot the Multi-Year Combo Chart.")
 
     with tab2:
         st.subheader(f"Demographic Distribution ({selected_year})")
@@ -1354,7 +1348,6 @@ def render_tb():
             den_col = "All Reg Group 15 above TB Cases"
             
             if "Facility" in df_hiv.columns and "Quarter" in df_hiv.columns and num_col in df_hiv.columns and den_col in df_hiv.columns:
-                # Top Level Metrics
                 total_tb_15 = df_hiv[den_col].sum()
                 total_tested = df_hiv[num_col].sum()
                 testing_rate = (total_tested / total_tb_15 * 100) if total_tb_15 > 0 else 0
@@ -1364,8 +1357,14 @@ def render_tb():
                 c6.metric("Tested for HIV", f"{int(total_tested):,}", f"{testing_rate:.1f}% Coverage")
                 st.markdown("<hr>", unsafe_allow_html=True)
                 
+                # --- FIX: Format Quarters Cleanly (e.g. '1.0' becomes 'Q1') ---
+                df_hiv_clean = df_hiv.copy()
+                df_hiv_clean['Quarter'] = pd.to_numeric(df_hiv_clean['Quarter'], errors='coerce')
+                df_hiv_clean = df_hiv_clean.dropna(subset=['Quarter'])
+                df_hiv_clean['Quarter'] = df_hiv_clean['Quarter'].astype(int).apply(lambda x: f"Q{x}")
+                
                 # Dynamic Pivot Table
-                grouped = df_hiv.groupby(['Facility', 'Quarter'])[[num_col, den_col]].sum().reset_index()
+                grouped = df_hiv_clean.groupby(['Facility', 'Quarter'])[[num_col, den_col]].sum().reset_index()
                 
                 def format_coverage(row):
                     n = int(row[num_col])
