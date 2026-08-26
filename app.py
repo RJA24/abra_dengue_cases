@@ -16,7 +16,7 @@ st.set_page_config(
     page_title="Abra PESU Portal", 
     page_icon="https://github.com/RJA24/abra_sia_2026/blob/main/PHO%20logo.png?raw=true", 
     layout="wide", 
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="hidden"
 )
 
 # Inject FontAwesome Library
@@ -36,7 +36,7 @@ st.markdown("""
     
     /* Hide default header/footer for a clean app feel */
     header { background: transparent !important; }
-    #MainMenu {visibility: hidden;} 
+    #MainMenu {visibility: visible;} 
     footer {visibility: hidden;} 
     
     .js-plotly-plot { margin-bottom: 2rem; }
