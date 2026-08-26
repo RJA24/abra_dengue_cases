@@ -30,38 +30,34 @@ st.markdown("""
     .stDeployButton, [data-testid="stAppDeployButton"] { display: none !important; }
     [data-testid="stToolbar"] { display: none !important; }
 
-    /* Adjust top padding */
+    /* Adjust top padding to pull title higher */
     .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
     
-    /* --- HEADER & SIDEBAR TOGGLE FIX --- */
-    /* Make the header transparent to remove the solid white bar */
+    /* --- BULLETPROOF HEADER & SIDEBAR TOGGLE --- */
+    /* 1. Make the header transparent */
     header[data-testid="stHeader"] { 
         background: transparent !important; 
     }
     
-    /* Force the sidebar toggle button to be a highly visible floating button */
-    [data-testid="collapsedControl"] {
-        display: inline-flex !important;
-        visibility: visible !important;
-        background-color: rgba(255, 255, 255, 0.95) !important;
-        border-radius: 8px !important;
+    /* 2. Target ANY button inside the header (Catches the sidebar toggle universally) */
+    header[data-testid="stHeader"] button {
+        background-color: rgba(255, 255, 255, 0.9) !important;
         border: 1px solid #cbd5e1 !important;
-        box-shadow: 0px 4px 6px rgba(0,0,0,0.1) !important;
+        border-radius: 8px !important;
+        box-shadow: 0px 4px 6px rgba(0,0,0,0.2) !important;
         margin: 10px !important;
-        z-index: 999999 !important;
+        visibility: visible !important;
+        display: flex !important;
     }
     
-    [data-testid="collapsedControl"] svg {
-        fill: #0f172a !important; /* Force the icon arrow to be dark blue/black */
+    /* 3. Force the SVG arrow icon inside the button to be dark */
+    header[data-testid="stHeader"] button svg {
+        fill: #0f172a !important;
+        color: #0f172a !important;
     }
+    /* ------------------------------------------- */
 
-    [data-testid="collapsedControl"]:hover {
-        background-color: #f1f5f9 !important;
-        border-color: #94a3b8 !important;
-    }
-    /* ----------------------------------- */
-    
-    /* Hide default header/footer for a clean app feel */
+    /* Hide default footer */
     #MainMenu {visibility: hidden;} 
     footer {visibility: hidden;} 
     
