@@ -899,7 +899,7 @@ def render_dengue():
     with tab4:
         map_style_choice = st.radio("Select Map Theme:", ["Light", "Street", "Satellite", "Dark"], horizontal=True, key="dengue_map_theme")
         style_map = {"Light": "carto-positron-nolabels", "Street": "open-street-map", "Dark": "carto-darkmatter-nolabels", "Satellite": "white-bg"}
-        label_color = 'white' if map_style_choice in ["Dark", "Satellite"] else 'black'
+        label_color = '#ffffff' if map_style_choice == "Satellite" else '#000000'
         
         # Dynamically determine the correct column name for Dengue
         brgy_col = "Barangay" if "Barangay" in filtered_df.columns else ("Brgy" if "Brgy" in filtered_df.columns else None)
@@ -965,7 +965,7 @@ def render_dengue():
                             fig_map.update_layout(map_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
                         
                         fig_map.add_trace(go.Scattermap(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
-                        st.plotly_chart(fig_map, use_container_width=True)
+                        st.plotly_chart(fig_map, use_container_width=True, config={'scrollZoom': False})
                     except Exception as e:
                         st.error(f"Plotly encountered an internal error rendering the Barangay map: {e}")
                 else:
@@ -1022,7 +1022,7 @@ def render_dengue():
                             fig_map.update_layout(map_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
 
                         fig_map.add_trace(go.Scattermap(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
-                        st.plotly_chart(fig_map, use_container_width=True)
+                        st.plotly_chart(fig_map, use_container_width=True, config={'scrollZoom': False})
                     except Exception as e:
                         st.error(f"Plotly encountered an internal error rendering the Municipality map: {e}")
                 else:
@@ -1365,7 +1365,7 @@ def render_tb():
     with tab6:
         map_style_choice = st.radio("Select Map Theme:", ["Light", "Street", "Satellite", "Dark"], horizontal=True, key="tb_map_theme")
         style_map = {"Light": "carto-positron-nolabels", "Street": "open-street-map", "Dark": "carto-darkmatter-nolabels", "Satellite": "white-bg"}
-        label_color = 'white' if map_style_choice in ["Dark", "Satellite"] else 'black'
+        label_color = '#ffffff' if map_style_choice == "Satellite" else '#000000'
 
         if muncity_input != "All Municipalities":
             st.subheader(f"Geographic Heatmap: Barangays in {muncity_input} ({selected_year})")
@@ -1429,7 +1429,7 @@ def render_tb():
                             fig_map.update_layout(map_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
                         
                         fig_map.add_trace(go.Scattermap(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
-                        st.plotly_chart(fig_map, use_container_width=True)
+                        st.plotly_chart(fig_map, use_container_width=True, config={'scrollZoom': False})
                     except Exception as e:
                         st.error(f"Plotly encountered an internal error rendering the Barangay map: {e}")
                 else:
@@ -1487,7 +1487,7 @@ def render_tb():
                             fig_map.update_layout(map_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
 
                         fig_map.add_trace(go.Scattermap(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
-                        st.plotly_chart(fig_map, use_container_width=True)
+                        st.plotly_chart(fig_map, use_container_width=True, config={'scrollZoom': False})
                     except Exception as e:
                         st.error(f"Plotly encountered an internal error rendering the Municipality map: {e}")
                 else:
