@@ -29,12 +29,16 @@ st.markdown("""
     /* Hide Deploy button */
     .stDeployButton, [data-testid="stAppDeployButton"] { display: none !important; }
 
-    /* Adjust padding to pull content up slightly, but safely */
+    /* SURGICAL FIX: Make ONLY the header background transparent so the mountain shows through */
+    header[data-testid="stHeader"] { 
+        background: transparent !important; 
+    }
+
+    /* Adjust padding to pull content up slightly */
     .block-container { padding-top: 2rem; padding-bottom: 2rem; }
 
     /* Hide standard footer */
-    #MainMenu { visibility: hidden; }
-    footer { visibility: hidden; } 
+    #MainMenu, footer { visibility: hidden; } 
     
     .js-plotly-plot { margin-bottom: 2rem; }
     div.row-widget.stRadio > div { flex-direction: row; align-items: center; justify-content: center; background: #ffffff; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
