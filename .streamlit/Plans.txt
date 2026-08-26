@@ -1,0 +1,6 @@
+don't give code yet, let's plan it. Here's the full code to sync.
+
+1. let's separate the cases per DSTB, MN, DRTB, TPT, add a dropdown choice filter in the sidebar, users can select 1 or more, or all. so that all tabs/KPIs show the data depends on the filter. make the colors uniform per case in all charts.
+2. remove the referral source chart in tab3.
+3.in tab 5, let's change the chart to a table that shows the coverage, numerator = All Reg Group 15 above TB Cases Tested or with Known HIV Status, denominator = All Reg Group 15 above TB Cases in the "2026 HIV" sheet. rows = facility, column = Quarter. Get it?
+4.in the image, make a chart the same as in the image, the BC and CD data will be from the "2026 DSTB" sheet column "Bacteriologic Status", the TPT, well from the 2026 TPT.

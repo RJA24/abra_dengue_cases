@@ -345,21 +345,38 @@ def load_tb_data(sheet_name):
 
 @st.cache_data(ttl=600)
 def get_all_core_tb():
-    # Load 2026 Data
+    # Load 2026 Data & Tag Case Types
     d26_ds = load_tb_data("2026 DSTB")
+    if not d26_ds.empty: d26_ds['Case_Type'] = 'DSTB'
     d26_dr = load_tb_data("2026 DRTB")
-    d26 = pd.concat([d26_ds, d26_dr], ignore_index=True)
+    if not d26_dr.empty: d26_dr['Case_Type'] = 'DRTB'
+    d26_mn = load_tb_data("2026 MN")
+    if not d26_mn.empty: d26_mn['Case_Type'] = 'MN'
+    
+    d26 = pd.concat([d26_ds, d26_dr, d26_mn], ignore_index=True)
     d26['Year'] = 2026
     
-    # Load Historical Data (2015-2025)
+    # Load Historical Data (2015-2025) & Tag
     h_ds = load_tb_data("DSTB 2015-2025")
+    if not h_ds.empty: h_ds['Case_Type'] = 'DSTB'
     h_dr = load_tb_data("DRTB 2015-2025")
-    hist = pd.concat([h_ds, h_dr], ignore_index=True)
-    hist['Year'] = pd.to_numeric(hist['Year'], errors='coerce')
+    if not h_dr.empty: h_dr['Case_Type'] = 'DRTB'
+    h_mn = load_tb_data("MN 2015-2025")
+    if not h_mn.empty: h_mn['Case_Type'] = 'MN'
     
-    # Combine everything into one master dataframe
-    combined = pd.concat([d26, hist], ignore_index=True)
-    return combined
+    hist = pd.concat([h_ds, h_dr, h_mn], ignore_index=True)
+    if not hist.empty: hist['Year'] = pd.to_numeric(hist['Year'], errors='coerce')
+    
+    return pd.concat([d26, hist], ignore_index=True)
+
+@st.cache_data(ttl=600)
+def get_all_tpt_data():
+    # Fetches all TPT data specifically for the combo trend chart
+    d26 = load_tb_data("2026 TPT")
+    if not d26.empty: d26['Year'] = 2026
+    h_tpt = load_tb_data("TPT 2021-2025")
+    if not h_tpt.empty: h_tpt['Year'] = pd.to_numeric(h_tpt['Year'], errors='coerce')
+    return pd.concat([d26, h_tpt], ignore_index=True)
 
 @st.cache_data(ttl=600)
 def get_aux_tb_data(program, selected_year):
@@ -1086,106 +1103,80 @@ def render_dengue():
 # ==========================================
 
 def render_tb():
-    # 1. Load Universal Masterlist Data
     df_all_raw = get_all_core_tb()
+    CASE_COLORS = {"DSTB": "#3b82f6", "DRTB": "#ef4444", "MN": "#f59e0b", "TPT": "#10b981"}
 
     with st.sidebar:
         if st.button("Back to Menu", icon=":material/arrow_back:", use_container_width=True):
             st.session_state.active_program = None
             st.rerun()
-            
         st.markdown("<hr style='margin: 15px 0; border: none; border-bottom: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
         st.markdown("<h4 style='color: #0f172a; margin: 0 0 15px 0;'><i class='fa-solid fa-folder-open' style='color: #475569;'></i> TB Controls</h4>", unsafe_allow_html=True)
         
-        # --- NEW: Specific Year Selector ---
         available_years = list(range(2026, 2014, -1))
         selected_year = st.selectbox("Select Year", options=available_years, index=0)
 
-        # Municipality Filter
+        # Global Case Type Filter
+        case_type_input = st.multiselect(
+            "Filter Case Type", 
+            options=["DSTB", "DRTB", "MN", "TPT"], 
+            default=["DSTB", "DRTB", "MN", "TPT"]
+        )
+
         if not df_all_raw.empty and "Muncity" in df_all_raw.columns:
             muni_options = ["All Municipalities"] + sorted(df_all_raw["Muncity"].dropna().unique().tolist())
             muncity_input = st.selectbox("Filter Municipality", options=muni_options, index=0)
-        else:
-            muncity_input = "All Municipalities"
+        else: muncity_input = "All Municipalities"
             
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
         if st.button("Refresh Data", icon=":material/refresh:", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
-    # 2. Apply Filters globally for Trends
-    if muncity_input != "All Municipalities":
-        df_all_filtered = df_all_raw[df_all_raw["Muncity"] == muncity_input]
-    else:
-        df_all_filtered = df_all_raw
+    # Apply Filters (Keep TPT isolated from the main df_combined)
+    active_types = [t for t in case_type_input if t != "TPT"]
+    
+    if muncity_input != "All Municipalities": df_all_filtered = df_all_raw[(df_all_raw["Muncity"] == muncity_input) & (df_all_raw["Case_Type"].isin(active_types))]
+    else: df_all_filtered = df_all_raw[df_all_raw["Case_Type"].isin(active_types)]
 
-    # Extract Data for the specifically selected year (and the previous year for YOY math)
     df_combined = df_all_filtered[df_all_filtered['Year'] == selected_year]
     df_prev_year = df_all_filtered[df_all_filtered['Year'] == (selected_year - 1)]
     
-    # Load auxiliary data based on year
-    df_tpt = get_aux_tb_data('TPT', selected_year)
+    if "TPT" in case_type_input: df_tpt = get_aux_tb_data('TPT', selected_year)
+    else: df_tpt = pd.DataFrame()
+    
     df_hiv = get_aux_tb_data('HIV', selected_year)
 
-    # --- DOWNLOAD BUTTON IN SIDEBAR ---
     with st.sidebar:
         if not df_combined.empty:
             st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
             csv_data = df_combined.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label=f"Download {selected_year} Data",
-                data=csv_data,
-                file_name=f"Abra_TB_Data_{selected_year}_{muncity_input.replace(' ', '_')}.csv",
-                mime="text/csv",
-                icon=":material/download:",
-                use_container_width=True
-            )
+            st.download_button(label=f"Download {selected_year} Data", data=csv_data, file_name=f"Abra_TB_Data_{selected_year}.csv", mime="text/csv", icon=":material/download:", use_container_width=True)
 
     st.title("Abra PESU: Tuberculosis Control Program")
     st.markdown("---")
 
-    if df_combined.empty:
-        st.warning(f"No case data found for {selected_year} in the selected area.")
-        return
-    
-    # 3. YOY Metrics (Year Over Year)
+    # YOY Metrics (TPT is safely excluded from curr_cases)
     curr_cases = len(df_combined)
     prev_cases = len(df_prev_year)
     case_delta = curr_cases - prev_cases
 
     def get_success_count(df):
-        if "Outcome/Status" in df.columns:
-            return len(df[df["Outcome/Status"].str.upper().isin(["CURED", "TREATMENT COMPLETED"])])
+        if "Outcome/Status" in df.columns: return len(df[df["Outcome/Status"].str.upper().isin(["CURED", "TREATMENT COMPLETED"])])
         return 0
 
     curr_success = get_success_count(df_combined)
     prev_success = get_success_count(df_prev_year)
     success_delta = curr_success - prev_success
 
-    ABRA_BRGY_COUNTS = {
-        "BANGUED": 31, "BOLINEY": 8, "BUCAY": 21, "BUCLOC": 4, "DAGUIOMAN": 4, 
-        "DANGLAS": 7, "DOLORES": 15, "LA PAZ": 12, "LACUB": 6, "LAGANGILANG": 17, 
-        "LAGAYAN": 5, "LANGIDEN": 6, "LICUAN-BAAY": 11, "LUBA": 8, "MALIBCONG": 12, 
-        "MANABO": 11, "PEÑARRUBIA": 9, "PIDIGAN": 15, "PILAR": 19, "SALLAPADAN": 9, 
-        "SAN ISIDRO": 9, "SAN JUAN": 19, "SAN QUINTIN": 6, "TAYUM": 11, "TINEG": 10, 
-        "TUBO": 10, "VILLAVICIOSA": 8
-    }
+    ABRA_BRGY_COUNTS = {"BANGUED": 31, "BOLINEY": 8, "BUCAY": 21, "BUCLOC": 4, "DAGUIOMAN": 4, "DANGLAS": 7, "DOLORES": 15, "LA PAZ": 12, "LACUB": 6, "LAGANGILANG": 17, "LAGAYAN": 5, "LANGIDEN": 6, "LICUAN-BAAY": 11, "LUBA": 8, "MALIBCONG": 12, "MANABO": 11, "PEÑARRUBIA": 9, "PIDIGAN": 15, "PILAR": 19, "SALLAPADAN": 9, "SAN ISIDRO": 9, "SAN JUAN": 19, "SAN QUINTIN": 6, "TAYUM": 11, "TINEG": 10, "TUBO": 10, "VILLAVICIOSA": 8}
 
     if muncity_input == "All Municipalities":
         geo_kpi_title = "Affected Municipalities"
-        # STRICT FILTER: Only count valid Abra municipalities (fixes the 28/27 bug)
-        if 'Muncity' in df_combined.columns:
-            valid_curr = df_combined[df_combined['Muncity'].isin(ALL_ABRA_MUNICIPALITIES)]
-            curr_geo = valid_curr['Muncity'].nunique()
-        else:
-            curr_geo = 0
-            
-        if 'Muncity' in df_prev_year.columns:
-            valid_prev = df_prev_year[df_prev_year['Muncity'].isin(ALL_ABRA_MUNICIPALITIES)]
-            prev_geo = valid_prev['Muncity'].nunique()
-        else:
-            prev_geo = 0
-            
+        if 'Muncity' in df_combined.columns: curr_geo = df_combined[df_combined['Muncity'].isin(ALL_ABRA_MUNICIPALITIES)]['Muncity'].nunique()
+        else: curr_geo = 0
+        if 'Muncity' in df_prev_year.columns: prev_geo = df_prev_year[df_prev_year['Muncity'].isin(ALL_ABRA_MUNICIPALITIES)]['Muncity'].nunique()
+        else: prev_geo = 0
         geo_delta = curr_geo - prev_geo
         geo_val = f"{curr_geo} / 27"
     else:
@@ -1196,94 +1187,85 @@ def render_tb():
         total_brgy = ABRA_BRGY_COUNTS.get(muncity_input, "?")
         geo_val = f"{curr_geo} / {total_brgy}"
 
-    # --- UPGRADED PREMIUM HTML CARDS WITH YOY DELTAS ---
     def create_yoy_card(title, value, border_color, delta_val, inverse_color=False):
-        # Determine arrow and colors based on whether high/low is good/bad
         if delta_val > 0:
             arrow = "↑"
-            text_color = "#dc2626" if inverse_color else "#16a34a" # Red if inverse (bad), Green if normal (good)
+            text_color = "#dc2626" if inverse_color else "#16a34a"
             bg_color = "#fee2e2" if inverse_color else "#dcfce3"
         elif delta_val < 0:
             arrow = "↓"
-            text_color = "#16a34a" if inverse_color else "#dc2626" # Green if inverse (good), Red if normal (bad)
+            text_color = "#16a34a" if inverse_color else "#dc2626" 
             bg_color = "#dcfce3" if inverse_color else "#fee2e2"
         else:
             arrow = "→"
             text_color = "#64748b"
             bg_color = "#f1f5f9"
-            
-        return f"""
-        <div style="background-color: #ffffff; padding: 22px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; border-left: 8px solid {border_color}; text-align: center;">
-            <p style="margin: 0; font-size: 1rem; color: #64748b; font-weight: 600; text-transform: uppercase;">{title}</p>
-            <h2 style="margin: 10px 0 10px 0; font-size: 2.6rem; color: #0f172a; font-weight: 800;">{value}</h2>
-            <span style="color: {text_color}; font-size: 0.85rem; font-weight: 700; background-color: {bg_color}; padding: 4px 10px; border-radius: 20px;">
-                {arrow} {abs(delta_val)} vs prev year
-            </span>
-        </div>
-        """
+        return f"""<div style="background-color: #ffffff; padding: 22px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; border-left: 8px solid {border_color}; text-align: center;"><p style="margin: 0; font-size: 1rem; color: #64748b; font-weight: 600; text-transform: uppercase;">{title}</p><h2 style="margin: 10px 0 10px 0; font-size: 2.6rem; color: #0f172a; font-weight: 800;">{value}</h2><span style="color: {text_color}; font-size: 0.85rem; font-weight: 700; background-color: {bg_color}; padding: 4px 10px; border-radius: 20px;">{arrow} {abs(delta_val)} vs prev year</span></div>"""
 
     col1, col2, col3 = st.columns(3)
-    with col1: 
-        # Inverse: Fewer cases = Good (Green)
-        st.markdown(create_yoy_card(f"Total Cases ({selected_year})", f"{curr_cases:,}", "#2563eb", case_delta, inverse_color=True), unsafe_allow_html=True)
-    with col2: 
-        # Normal: More successes = Good (Green)
-        st.markdown(create_yoy_card(f"Successful Outcomes", f"{curr_success:,}", "#10b981", success_delta, inverse_color=False), unsafe_allow_html=True)
-    with col3: 
-        # Inverse: Fewer affected areas = Good (Green)
-        st.markdown(create_yoy_card(geo_kpi_title, geo_val, "#f59e0b", geo_delta, inverse_color=True), unsafe_allow_html=True)
+    with col1: st.markdown(create_yoy_card(f"Total Cases ({selected_year})", f"{curr_cases:,}", "#2563eb", case_delta, inverse_color=True), unsafe_allow_html=True)
+    with col2: st.markdown(create_yoy_card(f"Successful Outcomes", f"{curr_success:,}", "#10b981", success_delta, inverse_color=False), unsafe_allow_html=True)
+    with col3: st.markdown(create_yoy_card(geo_kpi_title, geo_val, "#f59e0b", geo_delta, inverse_color=True), unsafe_allow_html=True)
     
     st.markdown("<br>", unsafe_allow_html=True)
 
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-        "Epidemiological Trends", "Demographics", "Clinical & Outcomes", 
-        "Preventive Treatment (TPT)", "TB-HIV Collaboration", "Choropleth Map", "Raw Line List"
-    ])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Epidemiological Trends", "Demographics", "Clinical & Outcomes", "Preventive Treatment (TPT)", "TB-HIV Collaboration", "Choropleth Map", "Raw Line List"])
 
     with tab1:
-        # --- MULTI-YEAR TREND CHART ---
-        st.subheader("Multi-Year Trend Analysis")
-        yearly_trend = df_all_filtered.groupby("Year").size().reset_index(name="Total Cases")
-        if not yearly_trend.empty:
-            fig_yoy = px.line(yearly_trend, x="Year", y="Total Cases", markers=True, title=f"Historical Case Trend (2015-{selected_year})")
-            fig_yoy.update_traces(line_color='#2563eb', marker=dict(size=10))
+        # --- FEATURE 4: COMBO CHART ---
+        st.subheader("TB All Forms and TPT Enrollment (2021-2026)")
+        
+        combo_tb = df_all_raw[(df_all_raw['Year'] >= 2021) & (df_all_raw['Case_Type'] == 'DSTB')].copy()
+        if 'Bacteriologic Status' in combo_tb.columns:
+            combo_tb['Bac_Clean'] = combo_tb['Bacteriologic Status'].fillna('Unknown').astype(str).str.upper()
+            bc_counts = combo_tb[combo_tb['Bac_Clean'].str.contains('BACTERIOLOGICALLY CONFIRMED|BC')].groupby('Year').size()
+            cd_counts = combo_tb[combo_tb['Bac_Clean'].str.contains('CLINICALLY DIAGNOSED|CD')].groupby('Year').size()
+        else:
+            bc_counts, cd_counts = pd.Series(dtype=int), pd.Series(dtype=int)
             
-            # Highlight the currently selected year
-            fig_yoy.add_vline(x=selected_year, line_width=2, line_dash="dash", line_color="red", annotation_text=f"{selected_year} Selected")
+        tpt_all = get_all_tpt_data()
+        if not tpt_all.empty: tpt_counts = tpt_all[tpt_all['Year'] >= 2021].groupby('Year').size()
+        else: tpt_counts = pd.Series(dtype=int)
             
-            fig_yoy.update_layout(height=400, xaxis=dict(dtick=1))
-            st.plotly_chart(fig_yoy, use_container_width=True)
+        combo_years = sorted(list(set(bc_counts.index).union(set(cd_counts.index)).union(set(tpt_counts.index))))
+        combo_years = [int(y) for y in combo_years if pd.notna(y)]
+        
+        if combo_years:
+            fig_combo = go.Figure()
+            y_bc = [bc_counts.get(y, 0) for y in combo_years]
+            y_cd = [cd_counts.get(y, 0) for y in combo_years]
+            y_tpt = [tpt_counts.get(y, 0) for y in combo_years]
+            
+            fig_combo.add_trace(go.Bar(x=combo_years, y=y_bc, name="BC", marker_color="#ff0000", text=y_bc, textposition="inside", textfont=dict(color="white")))
+            fig_combo.add_trace(go.Bar(x=combo_years, y=y_cd, name="CD", marker_color="#b2d89b", text=y_cd, textposition="inside", textfont=dict(color="black")))
+            fig_combo.add_trace(go.Scatter(x=combo_years, y=y_tpt, name="TPT", mode="lines+markers+text", marker_color="#3b82f6", line=dict(width=3), marker=dict(size=8), text=y_tpt, textposition="middle right", textfont=dict(color="#3b82f6", size=14, family="Arial Black")))
+            
+            fig_combo.update_layout(barmode='stack', height=500, xaxis=dict(tickmode='array', tickvals=combo_years), legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5))
+            st.plotly_chart(fig_combo, use_container_width=True)
 
         st.markdown("<hr>", unsafe_allow_html=True)
-
-        # --- MONTHLY TREND CHART (Selected Year) ---
         st.subheader(f"Monthly Case Detection ({selected_year})")
         if "Date of Diagnosis" in df_combined.columns and not df_combined.empty:
             df_combined['Diag_Date'] = pd.to_datetime(df_combined['Date of Diagnosis'], errors='coerce')
             df_combined['Month'] = df_combined['Diag_Date'].dt.month
-            
-            # Map numbers to month names
             month_map = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
             
-            monthly_trend = df_combined.dropna(subset=['Month']).groupby('Month').size().reset_index(name='Cases')
+            # Group by Case Type for unified colors
+            monthly_trend = df_combined.dropna(subset=['Month']).groupby(['Month', 'Case_Type']).size().reset_index(name='Cases')
             monthly_trend['Month Name'] = monthly_trend['Month'].map(month_map)
             
             if not monthly_trend.empty:
-                fig_trend = px.bar(monthly_trend, x='Month Name', y='Cases', text_auto=True, title=f"Cases by Month in {selected_year}")
-                fig_trend.update_traces(marker_color='#d97706')
+                fig_trend = px.bar(monthly_trend, x='Month Name', y='Cases', color='Case_Type', text_auto=True, color_discrete_map=CASE_COLORS)
                 fig_trend.update_layout(height=400, xaxis_title="Month", yaxis_title="Number of Cases")
                 st.plotly_chart(fig_trend, use_container_width=True)
-            else:
-                st.info(f"Insufficient date data for monthly trend analysis in {selected_year}.")
+            else: st.info(f"Insufficient date data for monthly trend analysis in {selected_year}.")
 
     with tab2:
         st.subheader(f"Demographic Distribution ({selected_year})")
         if "Muncity" in df_combined.columns and muncity_input == "All Municipalities":
-            muncity_counts = df_combined["Muncity"].value_counts().reset_index()
-            muncity_counts.columns = ["Municipality", "Count"]
-            fig_bar = px.bar(muncity_counts, x="Municipality", y="Count", title="Total TB Cases per Municipality", text_auto=True)
-            fig_bar.update_traces(marker_color="#0284c7") 
-            fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, height=500)
+            muncity_counts = df_combined.groupby(["Muncity", "Case_Type"]).size().reset_index(name="Count")
+            fig_bar = px.bar(muncity_counts, x="Muncity", y="Count", color="Case_Type", title="Total TB Cases per Municipality", text_auto=True, color_discrete_map=CASE_COLORS)
+            fig_bar.update_layout(xaxis={'categoryorder':'total descending'}, barmode='stack', height=500)
             st.plotly_chart(fig_bar, use_container_width=True)
 
         if "Age" in df_combined.columns and "Sex" in df_combined.columns:
@@ -1301,13 +1283,11 @@ def render_tb():
             fig_pyr = go.Figure()
             fig_pyr.add_trace(go.Bar(y=age_labels, x=males_negative, name='Male', orientation='h', marker_color='#2563eb', text=males.astype(int), hovertemplate="Male: %{text}<extra></extra>"))
             fig_pyr.add_trace(go.Bar(y=age_labels, x=females, name='Female', orientation='h', marker_color='#ec4899', text=females.astype(int), hovertemplate="Female: %{text}<extra></extra>"))
-
             max_val = int(max(males.max(), females.max())) if not males.empty and not females.empty else 10
             if max_val == 0: max_val = 10
             step = max(1, max_val // 5)
             tick_vals = list(range(-((max_val // step) * step + step), ((max_val // step) * step + step) + step, step))
             tick_text = [str(abs(v)) for v in tick_vals]
-
             fig_pyr.update_layout(title="Age and Sex Distribution of TB Cases", barmode='relative', bargap=0.1, height=500, xaxis=dict(tickvals=tick_vals, ticktext=tick_text, title="No. of Cases"), yaxis=dict(title="Age Group"))
             st.plotly_chart(fig_pyr, use_container_width=True)
             
@@ -1320,7 +1300,6 @@ def render_tb():
                 outcome_counts.columns = ["Outcome", "Count"]
                 fig_pie_out = px.pie(outcome_counts, names="Outcome", values="Count", hole=0.45, title="Treatment Outcomes")
                 st.plotly_chart(fig_pie_out, use_container_width=True)
-                
         with c2:
             if "Registration Group" in df_combined.columns:
                 reg_counts = df_combined["Registration Group"].fillna("Unknown").value_counts().reset_index()
@@ -1328,16 +1307,8 @@ def render_tb():
                 fig_pie_reg = px.pie(reg_counts, names="Registration Group", values="Count", hole=0.45, title="Patient Registration Group")
                 st.plotly_chart(fig_pie_reg, use_container_width=True)
 
-        c_source, c_site = st.columns(2)
-        with c_source:
-            if "Source of Patient" in df_combined.columns:
-                src_counts = df_combined["Source of Patient"].fillna("Unknown").value_counts().reset_index()
-                src_counts.columns = ["Source", "Count"]
-                fig_src = px.bar(src_counts, x="Count", y="Source", orientation='h', title="Referral Source")
-                fig_src.update_traces(marker_color='#f59e0b')
-                fig_src.update_layout(yaxis={'categoryorder':'total ascending'})
-                st.plotly_chart(fig_src, use_container_width=True)
-
+        # --- FEATURE 2: Referral Source Removed, Replaced cleanly by Bacteriologic Status ---
+        c_site, c_bac = st.columns(2)
         with c_site:
             if "Anatomical Site" in df_combined.columns:
                 site_counts = df_combined["Anatomical Site"].fillna("Unknown").value_counts().reset_index()
@@ -1346,12 +1317,13 @@ def render_tb():
                 fig_site.update_traces(marker_colors=['#0ea5e9', '#8b5cf6'])
                 st.plotly_chart(fig_site, use_container_width=True)
 
-        if "Bacteriologic Status" in df_combined.columns:
-            bac_counts = df_combined["Bacteriologic Status"].fillna("Unknown").value_counts().reset_index()
-            bac_counts.columns = ["Bacteriologic Status", "Count"]
-            fig_bar_bac = px.bar(bac_counts, x="Bacteriologic Status", y="Count", text_auto=True, title="Bacteriologic Status")
-            fig_bar_bac.update_traces(marker_color='#10b981')
-            st.plotly_chart(fig_bar_bac, use_container_width=True)
+        with c_bac:
+            if "Bacteriologic Status" in df_combined.columns:
+                bac_counts = df_combined["Bacteriologic Status"].fillna("Unknown").value_counts().reset_index()
+                bac_counts.columns = ["Bacteriologic Status", "Count"]
+                fig_bar_bac = px.bar(bac_counts, x="Bacteriologic Status", y="Count", text_auto=True, title="Bacteriologic Status")
+                fig_bar_bac.update_traces(marker_color='#10b981')
+                st.plotly_chart(fig_bar_bac, use_container_width=True)
 
     with tab4:
         st.subheader(f"Preventive Treatment (TPT) Analytics ({selected_year})")
@@ -1372,40 +1344,44 @@ def render_tb():
                     fig_reg_tpt.update_traces(marker_color='#8b5cf6')
                     st.plotly_chart(fig_reg_tpt, use_container_width=True)
         else:
-            st.info(f"No TPT data available for {selected_year}.")
+            st.info(f"No TPT data available for {selected_year} or TPT filter is disabled.")
 
     with tab5:
+        # --- FEATURE 3: HIV Pivot Table ---
         st.subheader(f"TB-HIV Collaborative Activities ({selected_year})")
         if not df_hiv.empty:
-            try:
-                col_total_tb = "All Reg Group 15 above TB Cases"
-                col_tested = "All Reg Group 15 above TB Cases Tested or with Known HIV Status"
-                col_positive = "All Reg Group 15 above Confirmed HIV+TB Patients"
-                col_art = "All Reg Group 15 above Confirmed HIV+TB Patients Started on ART"
-                
-                total_tb_15 = df_hiv[col_total_tb].sum()
-                total_tested = df_hiv[col_tested].sum()
-                total_pos = df_hiv[col_positive].sum()
-                total_art = df_hiv[col_art].sum()
-                
+            num_col = "All Reg Group 15 above TB Cases Tested or with Known HIV Status"
+            den_col = "All Reg Group 15 above TB Cases"
+            
+            if "Facility" in df_hiv.columns and "Quarter" in df_hiv.columns and num_col in df_hiv.columns and den_col in df_hiv.columns:
+                # Top Level Metrics
+                total_tb_15 = df_hiv[den_col].sum()
+                total_tested = df_hiv[num_col].sum()
                 testing_rate = (total_tested / total_tb_15 * 100) if total_tb_15 > 0 else 0
                 
-                c5, c6, c7 = st.columns(3)
-                c5.metric("Eligible TB Patients (15+ yrs)", f"{total_tb_15:,}")
-                c6.metric("Tested for HIV", f"{total_tested:,}", f"{testing_rate:.1f}% Coverage")
-                c7.metric("Co-infected & on ART", f"{total_art:,} / {total_pos:,}")
+                c5, c6 = st.columns(2)
+                c5.metric("Eligible TB Patients (15+ yrs)", f"{int(total_tb_15):,}")
+                c6.metric("Tested for HIV", f"{int(total_tested):,}", f"{testing_rate:.1f}% Coverage")
+                st.markdown("<hr>", unsafe_allow_html=True)
                 
-                if "Facility" in df_hiv.columns:
-                    facility_summary = df_hiv.groupby("Facility")[[col_total_tb, col_tested]].sum().reset_index()
-                    fig_fac = px.bar(facility_summary, x="Facility", y=[col_total_tb, col_tested], 
-                                     title="HIV Testing Compliance by Facility",
-                                     labels={"value": "Patient Count", "variable": "Metric"},
-                                     barmode="group")
-                    st.plotly_chart(fig_fac, use_container_width=True)
-            except Exception as e:
+                # Dynamic Pivot Table
+                grouped = df_hiv.groupby(['Facility', 'Quarter'])[[num_col, den_col]].sum().reset_index()
+                
+                def format_coverage(row):
+                    n = int(row[num_col])
+                    d = int(row[den_col])
+                    pct = (n / d * 100) if d > 0 else 0
+                    if d == 0 and n == 0: return "-"
+                    return f"{n} / {d} ({pct:.1f}%)"
+                    
+                grouped['Coverage'] = grouped.apply(format_coverage, axis=1)
+                pivot_hiv = grouped.pivot(index='Facility', columns='Quarter', values='Coverage').fillna('-')
+                
+                st.markdown("##### HIV Testing Coverage by Facility and Quarter")
+                st.dataframe(pivot_hiv, use_container_width=True)
+            else:
                 st.error("HIV Data columns do not match the expected ITIS export format.")
-        else:
-            st.info(f"No HIV data available for {selected_year}.")
+        else: st.info(f"No HIV data available for {selected_year}.")
 
     with tab6:
         map_style_choice = st.radio("Select Map Theme:", ["Light", "Street", "Satellite", "Dark"], horizontal=True, key="tb_map_theme")
@@ -1415,11 +1391,9 @@ def render_tb():
         if muncity_input != "All Municipalities":
             st.subheader(f"Geographic Heatmap: Barangays in {muncity_input} ({selected_year})")
             brgy_geojson, err = fetch_barangay_geojson(muncity_input)
-            
             if brgy_geojson and "Brgy" in df_combined.columns:
                 all_geojson_brgys = [f['properties']['Standard_Name'] for f in brgy_geojson['features']]
                 all_geojson_originals = [f['properties']['Original_Name'] for f in brgy_geojson['features']]
-                
                 base_df = pd.DataFrame({"Join_Key": all_geojson_brgys, "Barangay_Display": all_geojson_originals, "Base_Cases": 0})
                 curr_cases = df_combined.groupby("Brgy").size().reset_index(name="Filtered_Cases")
                 curr_cases["Join_Key"] = curr_cases["Brgy"].apply(clean_brgy_name)
@@ -1436,20 +1410,16 @@ def render_tb():
                     cases = match['Total Cases'].values[0] if not match.empty else 0
                     lon, lat = get_polygon_centroid(feat['geometry'])
                     if lon is not None and lat is not None:
-                        # MUST CAST TO FLOAT TO PREVENT JSON SERIALIZATION CRASHES
                         lons.append(float(lon)); lats.append(float(lat))
                         texts.append(f"{display_name.title()}<br>{int(cases)}")
                 
-                # MUST CAST TO FLOAT
                 cam_lat = float(np.mean(lats)) if lats else 17.58
                 cam_lon = float(np.mean(lons)) if lons else 120.83
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     max_cases = int(map_data["Total Cases"].max())
                     safe_max = max(1, max_cases)
-                    
                     try:
-                        # --- BULLETPROOF GRAPH OBJECTS ENGINE (BARANGAY) ---
                         fig_map = go.Figure(go.Choroplethmap(
                             geojson=brgy_geojson, 
                             locations=map_data['Join_Key'], 
@@ -1462,25 +1432,18 @@ def render_tb():
                             zmax=safe_max,
                             marker={"opacity": 1.0, "line": {"width": 0.5, "color": "gray"}}
                         ))
-                        
                         fig_map.update_layout(
                             map_style=style_map[map_style_choice],
                             map_zoom=11.5,
                             map_center={"lat": cam_lat, "lon": cam_lon},
                             margin={"r":0,"t":20,"l":0,"b":0}, height=850
                         )
-                        
-                        if map_style_choice == "Satellite":
-                            fig_map.update_layout(map_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
-                        
+                        if map_style_choice == "Satellite": fig_map.update_layout(map_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
                         fig_map.add_trace(go.Scattermap(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
                         st.plotly_chart(fig_map, use_container_width=True, config={'scrollZoom': False})
-                    except Exception as e:
-                        st.error(f"Plotly encountered an internal error rendering the Barangay map: {e}")
-                else:
-                    st.warning("No geographic mapping data available for the selected filters.")
-            else:
-                st.error(err if err else "Barangay column (Brgy) missing in data.")
+                    except Exception as e: st.error(f"Plotly encountered an error rendering the map: {e}")
+                else: st.warning("No geographic mapping data available for the selected filters.")
+            else: st.error(err if err else "Barangay column (Brgy) missing in data.")
                 
         else:
             st.subheader(f"Geographic Heatmap: Municipalities in Abra ({selected_year})")
@@ -1498,16 +1461,13 @@ def render_tb():
                     cases = match['Total Cases'].values[0] if not match.empty else 0
                     lon, lat = get_polygon_centroid(feat['geometry'])
                     if lon is not None and lat is not None:
-                        # MUST CAST TO FLOAT
                         lons.append(float(lon)); lats.append(float(lat))
                         texts.append(f"{std_name.title()}<br>{int(cases)}")
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     max_cases = int(map_data["Total Cases"].max())
                     safe_max = max(1, max_cases)
-                            
                     try:
-                        # --- BULLETPROOF GRAPH OBJECTS ENGINE (MUNICIPALITY) ---
                         fig_map = go.Figure(go.Choroplethmap(
                             geojson=abra_geojson, 
                             locations=map_data['Muncity'], 
@@ -1520,40 +1480,26 @@ def render_tb():
                             zmax=safe_max,
                             marker={"opacity": 1.0, "line": {"width": 0.5, "color": "gray"}}
                         ))
-                        
                         fig_map.update_layout(
                             map_style=style_map[map_style_choice],
                             map_zoom=8.8,
                             map_center={"lat": 17.58, "lon": 120.83},
                             margin={"r":0,"t":20,"l":0,"b":0}, height=850
                         )
-                        
-                        if map_style_choice == "Satellite":
-                            fig_map.update_layout(map_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
-
+                        if map_style_choice == "Satellite": fig_map.update_layout(map_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
                         fig_map.add_trace(go.Scattermap(lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color=label_color), hoverinfo='skip', showlegend=False))
                         st.plotly_chart(fig_map, use_container_width=True, config={'scrollZoom': False})
-                    except Exception as e:
-                        st.error(f"Plotly encountered an internal error rendering the Municipality map: {e}")
-                else:
-                    st.warning("No geographic mapping data available for the selected filters.")
-            else:
-                st.error("Could not fetch the Abra geographic boundaries.")
+                    except Exception as e: st.error(f"Plotly encountered an error rendering the map: {e}")
+                else: st.warning("No geographic mapping data available for the selected filters.")
+            else: st.error("Could not fetch the Abra geographic boundaries.")
 
     with tab7:
         st.subheader(f"Filtered TB Registry ({selected_year})")
         st.caption("Showing key programmatic columns. Use the Download button in the sidebar for the full dataset.")
-        
-        clean_cols = [
-            "TB/TPT Case No.", "First Name", "Last Name", "Age", "Sex", 
-            "Brgy", "Muncity", "Bacteriologic Status", "Outcome/Status", "Date Started Tx"
-        ]
+        clean_cols = ["TB/TPT Case No.", "Case_Type", "First Name", "Last Name", "Age", "Sex", "Brgy", "Muncity", "Bacteriologic Status", "Outcome/Status", "Date Started Tx"]
         available_cols = [col for col in clean_cols if col in df_combined.columns]
-        
-        if available_cols:
-            st.dataframe(df_combined[available_cols], use_container_width=True, hide_index=True, height=600)
-        else:
-            st.dataframe(df_combined, use_container_width=True, hide_index=True, height=600)
+        if available_cols: st.dataframe(df_combined[available_cols], use_container_width=True, hide_index=True, height=600)
+        else: st.dataframe(df_combined, use_container_width=True, hide_index=True, height=600)
 
 def main():
     if not st.session_state.logged_in:
