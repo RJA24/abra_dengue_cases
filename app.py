@@ -27,11 +27,28 @@ st.markdown("""
 st.markdown("""
     <style>
     /* Hide the Streamlit 'Manage app' button and developer toolbar */
-    .stDeployButton { display: none !important; }
+    .stDeployButton, [data-testid="stAppDeployButton"] { display: none !important; }
     [data-testid="stToolbar"] { display: none !important; }
 
-    /* Adjust top padding to pull title higher */
+    /* Adjust top padding */
     .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
+    
+    /* --- HEADER & SIDEBAR TOGGLE FIX --- */
+    /* 1. Make the header transparent to remove the ugly white bar */
+    header[data-testid="stHeader"] { background: transparent !important; }
+    
+    /* 2. Force the sidebar toggle button to stand out against the background image */
+    [data-testid="stSidebarCollapsedControl"] {
+        background-color: rgba(255, 255, 255, 0.65) !important;
+        border-radius: 8px !important;
+        margin-top: 5px !important;
+        margin-left: 5px !important;
+        transition: all 0.2s ease-in-out;
+    }
+    [data-testid="stSidebarCollapsedControl"]:hover {
+        background-color: rgba(255, 255, 255, 1.0) !important;
+    }
+    /* ----------------------------------- */
     
     /* Hide default header/footer for a clean app feel */
     #MainMenu {visibility: hidden;} 
