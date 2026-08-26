@@ -951,7 +951,7 @@ def render_dengue():
                             colorscale="Reds",
                             zmin=0, 
                             zmax=safe_max,
-                            marker={"opacity": 0.85}
+                            marker={"opacity": 1.0, "line": {"width": 0.5, "color": "gray"}}
                         ))
                         
                         fig_map.update_layout(
@@ -1008,7 +1008,7 @@ def render_dengue():
                             colorscale="Reds",
                             zmin=0, 
                             zmax=safe_max,
-                            marker={"opacity": 0.85}
+                            marker={"opacity": 1.0, "line": {"width": 0.5, "color": "gray"}}
                         ))
                         
                         fig_map.update_layout(
@@ -1415,7 +1415,7 @@ def render_tb():
                             colorscale="Blues",
                             zmin=0, 
                             zmax=safe_max,
-                            marker={"opacity": 0.85}
+                            marker={"opacity": 1.0, "line": {"width": 0.5, "color": "gray"}}
                         ))
                         
                         fig_map.update_layout(
@@ -1473,7 +1473,7 @@ def render_tb():
                             colorscale="Blues",
                             zmin=0, 
                             zmax=safe_max,
-                            marker={"opacity": 0.85}
+                            marker={"opacity": 1.0, "line": {"width": 0.5, "color": "gray"}}
                         ))
                         
                         fig_map.update_layout(
