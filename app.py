@@ -974,6 +974,10 @@ def render_dengue():
         
         brgy_col = "Barangay" if "Barangay" in filtered_df.columns else ("Brgy" if "Brgy" in filtered_df.columns else None)
         
+        # --- FREE ESRI TILE SERVER ---
+        tiles_url = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+        attr = "Esri"
+        
         if muncity_input != "All Municipalities":
             brgy_geojson, err = fetch_barangay_geojson(muncity_input)
             
@@ -1006,9 +1010,7 @@ def render_dengue():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
-                        # Direct CartoDB URL to bypass the API Key requirement
-                        tiles_url = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-                        m = folium.Map(location=[cam_lat, cam_lon], zoom_start=11.5, tiles=tiles_url, attr="CartoDB", scrollWheelZoom=False)
+                        m = folium.Map(location=[cam_lat, cam_lon], zoom_start=11.5, tiles=tiles_url, attr=attr, scrollWheelZoom=False)
                         
                         folium.Choropleth(
                             geo_data=brgy_geojson,
@@ -1024,8 +1026,9 @@ def render_dengue():
                         ).add_to(m)
                         
                         for i in range(len(lons)):
+                            # SMALLER FONT AND THINNER 1PX BORDER
                             html_label = f'''
-                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 10.5pt; font-weight: bold; font-family: Arial; color: #000000; text-align: center; line-height: 1.1; text-shadow: -1.5px -1.5px 0 #ffffff, 1.5px -1.5px 0 #ffffff, -1.5px 1.5px 0 #ffffff, 1.5px 1.5px 0 #ffffff; white-space: nowrap; pointer-events: none;">
+                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 9pt; font-weight: bold; font-family: Arial; color: #000000; text-align: center; line-height: 1.1; text-shadow: -1px -1px 0 #ffffff, 1px -1px 0 #ffffff, -1px 1px 0 #ffffff, 1px 1px 0 #ffffff; white-space: nowrap; pointer-events: none;">
                                     {texts[i]}
                                 </div>
                             '''
@@ -1062,8 +1065,7 @@ def render_dengue():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
-                        tiles_url = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-                        m = folium.Map(location=[17.58, 120.83], zoom_start=9.5, tiles=tiles_url, attr="CartoDB", scrollWheelZoom=False)
+                        m = folium.Map(location=[17.58, 120.83], zoom_start=9.5, tiles=tiles_url, attr=attr, scrollWheelZoom=False)
                         
                         folium.Choropleth(
                             geo_data=abra_geojson,
@@ -1083,8 +1085,7 @@ def render_dengue():
                             lon_val = lons[i]
                             town = texts[i].split('<br>')[0].upper()
                             
-                            # --- NUDGE ALGORITHM FOR ABRA ---
-                            # Pushes overlapping text apart so we can use a readable 10.5pt font!
+                            # NUDGE ALGORITHM FOR ABRA
                             if "MANABO" in town: lat_val -= 0.015
                             elif "SALLAPADAN" in town: lat_val += 0.015
                             elif "BANGUED" in town: lon_val -= 0.02
@@ -1093,7 +1094,7 @@ def render_dengue():
                             elif "PIDIGAN" in town: lon_val -= 0.015
                             
                             html_label = f'''
-                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 10.5pt; font-weight: bold; font-family: Arial; color: #000000; text-align: center; line-height: 1.1; text-shadow: -1.5px -1.5px 0 #ffffff, 1.5px -1.5px 0 #ffffff, -1.5px 1.5px 0 #ffffff, 1.5px 1.5px 0 #ffffff; white-space: nowrap; pointer-events: none;">
+                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 9pt; font-weight: bold; font-family: Arial; color: #000000; text-align: center; line-height: 1.1; text-shadow: -1px -1px 0 #ffffff, 1px -1px 0 #ffffff, -1px 1px 0 #ffffff, 1px 1px 0 #ffffff; white-space: nowrap; pointer-events: none;">
                                     {texts[i]}
                                 </div>
                             '''
@@ -1418,6 +1419,10 @@ def render_tb():
         else: st.info(f"No HIV data available for {selected_year}.")
 
     with tab6:
+        # --- FREE ESRI TILE SERVER ---
+        tiles_url = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+        attr = "Esri"
+
         if muncity_input != "All Municipalities":
             st.subheader(f"Geographic Heatmap: Barangays in {muncity_input} ({selected_year})")
             brgy_geojson, err = fetch_barangay_geojson(muncity_input)
@@ -1448,8 +1453,7 @@ def render_tb():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
-                        tiles_url = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-                        m = folium.Map(location=[cam_lat, cam_lon], zoom_start=11.5, tiles=tiles_url, attr="CartoDB", scrollWheelZoom=False)
+                        m = folium.Map(location=[cam_lat, cam_lon], zoom_start=11.5, tiles=tiles_url, attr=attr, scrollWheelZoom=False)
                         
                         folium.Choropleth(
                             geo_data=brgy_geojson,
@@ -1466,7 +1470,7 @@ def render_tb():
                         
                         for i in range(len(lons)):
                             html_label = f'''
-                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 10.5pt; font-weight: bold; font-family: Arial; color: #000000; text-align: center; line-height: 1.1; text-shadow: -1.5px -1.5px 0 #ffffff, 1.5px -1.5px 0 #ffffff, -1.5px 1.5px 0 #ffffff, 1.5px 1.5px 0 #ffffff; white-space: nowrap; pointer-events: none;">
+                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 9pt; font-weight: bold; font-family: Arial; color: #000000; text-align: center; line-height: 1.1; text-shadow: -1px -1px 0 #ffffff, 1px -1px 0 #ffffff, -1px 1px 0 #ffffff, 1px 1px 0 #ffffff; white-space: nowrap; pointer-events: none;">
                                     {texts[i]}
                                 </div>
                             '''
@@ -1502,8 +1506,7 @@ def render_tb():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
-                        tiles_url = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-                        m = folium.Map(location=[17.58, 120.83], zoom_start=9.5, tiles=tiles_url, attr="CartoDB", scrollWheelZoom=False)
+                        m = folium.Map(location=[17.58, 120.83], zoom_start=9.5, tiles=tiles_url, attr=attr, scrollWheelZoom=False)
                         
                         folium.Choropleth(
                             geo_data=abra_geojson,
@@ -1523,7 +1526,7 @@ def render_tb():
                             lon_val = lons[i]
                             town = texts[i].split('<br>')[0].upper()
                             
-                            # --- NUDGE ALGORITHM FOR ABRA ---
+                            # NUDGE ALGORITHM FOR ABRA
                             if "MANABO" in town: lat_val -= 0.015
                             elif "SALLAPADAN" in town: lat_val += 0.015
                             elif "BANGUED" in town: lon_val -= 0.02
@@ -1532,7 +1535,7 @@ def render_tb():
                             elif "PIDIGAN" in town: lon_val -= 0.015
                             
                             html_label = f'''
-                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 10.5pt; font-weight: bold; font-family: Arial; color: #000000; text-align: center; line-height: 1.1; text-shadow: -1.5px -1.5px 0 #ffffff, 1.5px -1.5px 0 #ffffff, -1.5px 1.5px 0 #ffffff, 1.5px 1.5px 0 #ffffff; white-space: nowrap; pointer-events: none;">
+                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 9pt; font-weight: bold; font-family: Arial; color: #000000; text-align: center; line-height: 1.1; text-shadow: -1px -1px 0 #ffffff, 1px -1px 0 #ffffff, -1px 1px 0 #ffffff, 1px 1px 0 #ffffff; white-space: nowrap; pointer-events: none;">
                                     {texts[i]}
                                 </div>
                             '''
