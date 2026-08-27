@@ -330,7 +330,7 @@ def apply_label_nudges(muni_name, lat, lon):
     name = str(muni_name).upper()
     
     if "BANGUED" in name:
-        lon += 0.03
+        lon += 0.02
     elif "BOLINEY" in name:
         pass
     elif "BUCAY" in name:
@@ -364,7 +364,8 @@ def apply_label_nudges(muni_name, lat, lon):
     elif "PEÑARRUBIA" in name:
         lon += 0.02
     elif "PIDIGAN" in name:
-        lon -= 0.015
+        lat += 0.015
+        lon += 0.015
     elif "PILAR" in name:
         pass
     elif "SALLAPADAN" in name:
