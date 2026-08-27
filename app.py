@@ -1008,7 +1008,7 @@ def render_dengue():
                     try:
                         fig_map = px.choropleth_map(
                             map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
-                            color='Total Cases', color_continuous_scale="Reds", map_style="carto-positron",
+                            color='Total Cases', color_continuous_scale="Reds", map_style="white-bg",
                             zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.7, hover_name='Barangay_Display',
                             hover_data={'Join_Key': False, 'Total Cases': ':,', 'Barangay_Display': False}
                         )
@@ -1046,7 +1046,7 @@ def render_dengue():
                     try:
                         fig_map = px.choropleth_map(
                             map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
-                            color='Total Cases', color_continuous_scale="Reds", map_style="carto-positron",
+                            color='Total Cases', color_continuous_scale="Reds", map_style="white-bg",
                             zoom=9.2, center={"lat": 17.58, "lon": 120.80}, opacity=0.7, hover_name='Muncity',
                             hover_data={'Muncity': False, 'Total Cases': ':,'}
                         )
@@ -1402,7 +1402,7 @@ def render_tb():
                     try:
                         fig_map = px.choropleth_map(
                             map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
-                            color='Total Cases', color_continuous_scale="Blues", map_style="carto-positron",
+                            color='Total Cases', color_continuous_scale="Blues", map_style="white-bg",
                             zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.7, hover_name='Barangay_Display',
                             hover_data={'Join_Key': False, 'Total Cases': ':,', 'Barangay_Display': False}
                         )
@@ -1439,7 +1439,7 @@ def render_tb():
                     try:
                         fig_map = px.choropleth_map(
                             map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
-                            color='Total Cases', color_continuous_scale="Blues", map_style="carto-positron",
+                            color='Total Cases', color_continuous_scale="Blues", map_style="white-bg",
                             zoom=9.2, center={"lat": 17.58, "lon": 120.80}, opacity=0.7, hover_name='Muncity',
                             hover_data={'Muncity': False, 'Total Cases': ':,'}
                         )
