@@ -1293,7 +1293,16 @@ def render_tb():
     
     st.markdown("<br>", unsafe_allow_html=True)
 
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Epidemiological Trends", "Demographics", "Clinical & Outcomes", "Preventive Treatment (TPT)", "TB-HIV Collaboration", "Choropleth Map", "Raw Line List"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+        "Epidemiological Trends", 
+        "Program Performance", 
+        "Demographics", 
+        "Clinical & Outcomes", 
+        "Preventive Treatment (TPT)", 
+        "TB-HIV Collaboration", 
+        "Choropleth Map", 
+        "Raw Line List"
+    ])
 
     with tab1:
         # --- FEATURE 4: COMBO CHART ---
@@ -1356,6 +1365,113 @@ def render_tb():
             else: st.info(f"Insufficient date data for monthly trend analysis in {selected_year}.")
 
     with tab2:
+        st.subheader(f"Program Performance Overview ({selected_year})")
+        st.markdown("---")
+        
+        # --- ROW 1: Total Cases & Case Notification Rate ---
+        col_tc, col_cnr = st.columns(2, gap="large")
+        
+        with col_tc:
+            st.markdown("### Total Cases")
+            if not df_combined.empty and "Case_Type" in df_combined.columns:
+                case_counts = df_combined["Case_Type"].value_counts().reset_index()
+                case_counts.columns = ["Case Type", "Count"]
+                fig_total_cases = px.pie(
+                    case_counts, names="Case Type", values="Count", hole=0.5,
+                    title=f"Total Cases Breakdown ({selected_year})",
+                    color_discrete_map={"DSTB": "#3b82f6", "DRTB": "#ef4444", "MN": "#f59e0b"}
+                )
+                fig_total_cases.update_layout(height=380, margin=dict(t=40, b=10, l=10, r=10))
+                st.plotly_chart(fig_total_cases, use_container_width=True)
+            else:
+                st.info(f"No case data available for {selected_year}.")
+                
+        with col_cnr:
+            st.markdown("### Case Notification Rate")
+            st.caption("Measures the total number of new and relapse TB cases detected per 100,051 population.")
+            
+            # Metric Card Placeholder / Calculation UI
+            total_cases_count = len(df_combined)
+            st.metric(label=f"Total Notified Cases ({selected_year})", value=f"{total_cases_count:,}")
+            
+            st.info(
+                "📊 **Recommended Chart:** A multi-year Case Notification Rate (CNR) trend line comparing "
+                "provincial notification targets against actual detection rates per 100k population."
+            )
+
+        st.markdown("<hr style='margin: 30px 0; border: none; border-bottom: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+
+        # --- ROW 2: Mortality & Treatment Success ---
+        col_mort, col_ts = st.columns(2, gap="large")
+        
+        with col_mort:
+            st.markdown("### Mortality")
+            if not df_combined.empty and "Outcome/Status" in df_combined.columns:
+                # Filter for deaths
+                df_died = df_combined[df_combined["Outcome/Status"].str.upper().str.contains("DIED", na=False)]
+                
+                if not df_died.empty:
+                    mort_counts = df_died["Outcome/Status"].value_counts().reset_index()
+                    mort_counts.columns = ["Reason / Status", "Count"]
+                    fig_mort = px.pie(
+                        mort_counts, names="Reason / Status", values="Count", hole=0.5,
+                        title=f"Mortality Breakdown ({selected_year})",
+                        color_discrete_sequence=["#ef4444", "#f97316", "#dc2626"]
+                    )
+                    fig_mort.update_layout(height=380, margin=dict(t=40, b=10, l=10, r=10))
+                    st.plotly_chart(fig_mort, use_container_width=True)
+                else:
+                    st.success(f"No recorded mortality outcomes for {selected_year}.")
+            else:
+                st.info("Outcome data not available.")
+                
+        with col_ts:
+            st.markdown("### Treatment Success")
+            st.caption("Based on previous cohort evaluation (2025 / 1-year lag)")
+            
+            # Fetch 2025 cohort data for treatment success evaluation
+            df_2025 = df_all_raw[df_all_raw['Year'] == 2025]
+            if not df_2025.empty and "Outcome/Status" in df_2025.columns:
+                outcomes = df_2025["Outcome/Status"].fillna("Unknown").value_counts().reset_index()
+                outcomes.columns = ["Outcome", "Count"]
+                
+                # Calculate Success Rate percentage
+                success_outcomes = df_2025[df_2025["Outcome/Status"].str.upper().isin(["CURED", "TREATMENT COMPLETED"])]
+                success_rate = (len(success_outcomes) / len(df_2025) * 100) if len(df_2025) > 0 else 0
+                
+                fig_ts = px.pie(
+                    outcomes, names="Outcome", values="Count", hole=0.6,
+                    title="2025 Treatment Outcomes Cohort",
+                    color_discrete_sequence=["#facc15", "#3b82f6", "#ec4899", "#10b981", "#64748b"]
+                )
+                fig_ts.update_traces(textinfo='value')
+                fig_ts.update_layout(
+                    height=380, 
+                    margin=dict(t=40, b=10, l=10, r=10),
+                    annotations=[dict(text=f"{success_rate:.1f}%<br><span style='font-size:12px'>Success Rate</span>", x=0.5, y=0.5, font_size=20, showlabel=False, showarrow=False)]
+                )
+                st.plotly_chart(fig_ts, use_container_width=True)
+            else:
+                st.info("Awaiting 2025 cohort outcome records.")
+
+        st.markdown("<hr style='margin: 30px 0; border: none; border-bottom: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+
+        # --- ROW 3: Case Detection Rate ---
+        st.markdown("### Case Detection Rate")
+        c_cdr_info, c_cdr_action = st.columns([2, 1])
+        with c_cdr_info:
+            st.markdown(
+                """
+                **Formula:**  
+                $$\\text{Case Detection Rate (CDR)} = \\frac{\\text{Total Notified Cases}}{\\text{2026 Provincial Target}} \\times 100$$
+                
+                *Note: This metric will automatically compute once the target baseline sheet is connected.*
+                """
+            )
+        with c_cdr_action:
+            st.warning("⚠️ Target sheet pending integration.")
+
+    with tab3:
         st.subheader(f"Demographic Distribution ({selected_year})")
         if "Muncity" in df_combined.columns and muncity_input == "All Municipalities":
             muncity_counts = df_combined.groupby(["Muncity", "Case_Type"]).size().reset_index(name="Count")
@@ -1386,7 +1502,7 @@ def render_tb():
             fig_pyr.update_layout(title="Age and Sex Distribution of TB Cases", barmode='relative', bargap=0.1, height=500, xaxis=dict(tickvals=tick_vals, ticktext=tick_text, title="No. of Cases"), yaxis=dict(title="Age Group"))
             st.plotly_chart(fig_pyr, use_container_width=True)
             
-    with tab3:
+    with tab4:
         st.subheader(f"Clinical & Treatment Outcomes ({selected_year})")
         c1, c2 = st.columns(2)
         with c1:
@@ -1420,7 +1536,7 @@ def render_tb():
                 fig_bar_bac.update_traces(marker_color='#10b981')
                 st.plotly_chart(fig_bar_bac, use_container_width=True)
 
-    with tab4:
+    with tab5:
         st.subheader(f"Preventive Treatment (TPT) Analytics ({selected_year})")
         if not df_tpt.empty:
             st.metric(f"Total Patients on TPT ({selected_year})", len(df_tpt))
@@ -1441,7 +1557,7 @@ def render_tb():
         else:
             st.info(f"No TPT data available for {selected_year} or TPT filter is disabled.")
 
-    with tab5:
+    with tab6:
         # --- FEATURE 3: HIV Pivot Table ---
         st.subheader(f"TB-HIV Collaborative Activities ({selected_year})")
         if not df_hiv.empty:
@@ -1483,7 +1599,7 @@ def render_tb():
                 st.error("HIV Data columns do not match the expected ITIS export format.")
         else: st.info(f"No HIV data available for {selected_year}.")
 
-    with tab6:
+    with tab7:
         if muncity_input != "All Municipalities":
             st.subheader(f"Geographic Heatmap: Barangays in {muncity_input} ({selected_year})")
             brgy_geojson, err = fetch_barangay_geojson(muncity_input)
@@ -1609,7 +1725,7 @@ def render_tb():
                 else: st.warning("No geographic mapping data available for the selected filters.")
             else: st.error("Could not fetch the Abra geographic boundaries.")
 
-    with tab7:
+    with tab8:
         st.subheader(f"Filtered TB Registry ({selected_year})")
         st.caption("Showing key programmatic columns. Use the Download button in the sidebar for the full dataset.")
         clean_cols = ["TB/TPT Case No.", "Case_Type", "First Name", "Last Name", "Age", "Sex", "Brgy", "Muncity", "Bacteriologic Status", "Outcome/Status", "Date Started Tx"]
