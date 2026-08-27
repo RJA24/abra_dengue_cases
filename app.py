@@ -322,6 +322,70 @@ def get_polygon_centroid(geometry):
         return float(np.mean(coords[:, 0])), float(np.mean(coords[:, 1]))
     except: return None, None
 
+def apply_label_nudges(muni_name, lat, lon):
+    """
+    Master control for all map label positions. 
+    Adjust lat (+North / -South) and lon (+East / -West) here.
+    """
+    name = str(muni_name).upper()
+    
+    if "BANGUED" in name:
+        lon -= 0.02
+    elif "BOLINEY" in name:
+        pass
+    elif "BUCAY" in name:
+        pass
+    elif "BUCLOC" in name:
+        pass
+    elif "DAGUIOMAN" in name:
+        pass
+    elif "DANGLAS" in name:
+        pass
+    elif "DOLORES" in name:
+        pass
+    elif "LA PAZ" in name:
+        pass
+    elif "LACUB" in name:
+        pass
+    elif "LAGANGILANG" in name:
+        pass
+    elif "LAGAYAN" in name:
+        pass
+    elif "LANGIDEN" in name:
+        lon -= 0.015
+    elif "LICUAN-BAAY" in name:
+        pass
+    elif "LUBA" in name:
+        pass
+    elif "MALIBCONG" in name:
+        pass
+    elif "MANABO" in name:
+        lat -= 0.015
+    elif "PEÑARRUBIA" in name:
+        lon += 0.02
+    elif "PIDIGAN" in name:
+        lon -= 0.015
+    elif "PILAR" in name:
+        pass
+    elif "SALLAPADAN" in name:
+        lat += 0.015
+    elif "SAN ISIDRO" in name:
+        pass
+    elif "SAN JUAN" in name:
+        pass
+    elif "SAN QUINTIN" in name:
+        pass
+    elif "TAYUM" in name:
+        pass
+    elif "TINEG" in name:
+        pass
+    elif "TUBO" in name:
+        pass
+    elif "VILLAVICIOSA" in name:
+        pass
+        
+    return float(lat), float(lon)
+
 @st.cache_data(ttl=600)
 def load_data():
     csv_url = f"{SHEET_URL}/export?format=csv&gid=0"
@@ -1056,18 +1120,13 @@ def render_dengue():
                     match = map_data[map_data['Muncity'] == std_name]
                     cases = match['Total Cases'].values[0] if not match.empty else 0
                     lon, lat = get_polygon_centroid(feat['geometry'])
+                    
                     if lon is not None and lat is not None:
-                        # --- NUDGE ALGORITHM FOR ABRA ---
-                        if "MANABO" in std_name.upper():
-                            lat -= 0.015
-                            lon -= 0.015
-                        elif "SALLAPADAN" in std_name.upper(): lat += 0.015
-                        elif "BANGUED" in std_name.upper(): lon -= 0.02
-                        elif "PEÑARRUBIA" in std_name.upper(): lon += 0.02
-                        elif "LANGIDEN" in std_name.upper(): lon -= 0.015
-                        elif "PIDIGAN" in std_name.upper(): lon -= 0.015
+                        # Call the master control function!
+                        lat, lon = apply_label_nudges(std_name, lat, lon)
                         
-                        lons.append(float(lon)); lats.append(float(lat))
+                        lons.append(lon)
+                        lats.append(lat)
                         texts.append(f"{std_name.title()}<br>{int(cases)}")
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
@@ -1490,21 +1549,19 @@ def render_tb():
             abra_geojson = fetch_muncity_geojson()
             if abra_geojson:
                 lons, lats, texts = [], [], []
+                lons, lats, texts = [], [], []
                 for feat in abra_geojson['features']:
                     std_name = feat['properties']['Standard_Name']
                     match = map_data[map_data['Muncity'] == std_name]
                     cases = match['Total Cases'].values[0] if not match.empty else 0
                     lon, lat = get_polygon_centroid(feat['geometry'])
+                    
                     if lon is not None and lat is not None:
-                        # --- NUDGE ALGORITHM FOR ABRA ---
-                        if "MANABO" in std_name.upper(): lat -= 0.015
-                        elif "SALLAPADAN" in std_name.upper(): lat += 0.015
-                        elif "BANGUED" in std_name.upper(): lon -= 0.02
-                        elif "PEÑARRUBIA" in std_name.upper(): lon += 0.02
-                        elif "LANGIDEN" in std_name.upper(): lon -= 0.015
-                        elif "PIDIGAN" in std_name.upper(): lon -= 0.015
+                        # Call the master control function!
+                        lat, lon = apply_label_nudges(std_name, lat, lon)
                         
-                        lons.append(float(lon)); lats.append(float(lat))
+                        lons.append(lon)
+                        lats.append(lat)
                         texts.append(f"{std_name.title()}<br>{int(cases)}")
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
