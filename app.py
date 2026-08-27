@@ -1058,7 +1058,9 @@ def render_dengue():
                     lon, lat = get_polygon_centroid(feat['geometry'])
                     if lon is not None and lat is not None:
                         # --- NUDGE ALGORITHM FOR ABRA ---
-                        if "MANABO" in std_name.upper(): lat -= 0.015
+                        if "MANABO" in std_name.upper():
+                            lat -= 0.015
+                            lon -= 0.015
                         elif "SALLAPADAN" in std_name.upper(): lat += 0.015
                         elif "BANGUED" in std_name.upper(): lon -= 0.02
                         elif "PEÑARRUBIA" in std_name.upper(): lon += 0.02
