@@ -1508,7 +1508,7 @@ def render_tb():
                                 )
                             ).add_to(m)
                             
-                        # 5. Render to Streamlit
+                        # 5. Render to Streamlit without triggering reruns
                         st_folium(m, use_container_width=True, height=850, returned_objects=[])
                         
                     except Exception as e:
@@ -1569,8 +1569,14 @@ def render_tb():
         st.caption("Showing key programmatic columns. Use the Download button in the sidebar for the full dataset.")
         clean_cols = ["TB/TPT Case No.", "Case_Type", "First Name", "Last Name", "Age", "Sex", "Brgy", "Muncity", "Bacteriologic Status", "Outcome/Status", "Date Started Tx"]
         available_cols = [col for col in clean_cols if col in df_combined.columns]
-        if available_cols: st.dataframe(df_combined[available_cols], use_container_width=True, hide_index=True, height=600)
-        else: st.dataframe(df_combined, use_container_width=True, hide_index=True, height=600)
+        
+        # FIX: Force PyArrow to treat mixed-type columns as strings to prevent crashes
+        safe_df = df_combined.copy()
+        for col in safe_df.columns:
+            safe_df[col] = safe_df[col].astype(str)
+            
+        if available_cols: st.dataframe(safe_df[available_cols], use_container_width=True, hide_index=True, height=600)
+        else: st.dataframe(safe_df, use_container_width=True, hide_index=True, height=600)
 
 def main():
     if not st.session_state.logged_in:
