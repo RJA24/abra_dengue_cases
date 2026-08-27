@@ -1092,7 +1092,20 @@ def render_dengue():
                             fig_map.update_layout(map_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
 
                         fig_map.add_trace(go.Scattermap(lon=lons, lat=lats, mode='markers+text', text=texts, textposition='middle center',textfont=dict(size=12, color=label_color), marker=dict(allowoverlap=True, size=0, opacity=0), hoverinfo='skip', showlegend=False))
-                        st.plotly_chart(fig_map, use_container_width=True, config={'scrollZoom': False})
+                        st.plotly_chart(
+                            fig_map, 
+                            use_container_width=True, 
+                            config={
+                                'scrollZoom': False,
+                                'toImageButtonOptions': {
+                                    'format': 'png', 
+                                    'filename': 'Abra_Choropleth_Map',
+                                    'height': 1080,
+                                    'width': 1920,
+                                    'scale': 2 # This doubles the resolution and separates the collision boxes!
+                                }
+                            }
+                        )
                     except Exception as e:
                         st.error(f"Plotly encountered an internal error rendering the Municipality map: {e}")
                 else:
