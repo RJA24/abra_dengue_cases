@@ -1088,7 +1088,7 @@ def render_dengue():
                         
                         fig_map.update_layout(
                             map_style=style_map[map_style_choice],
-                            map_zoom=8,
+                            map_zoom=8.5,
                             map_center={"lat": 17.58, "lon": 120.83}, # Fixed Abra coordinates
                             margin={"r":0,"t":20,"l":0,"b":0}, 
                             width=900, 
