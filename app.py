@@ -1022,7 +1022,8 @@ def render_dengue():
                             margin={"r":0,"t":0,"l":0,"b":0}, 
                             coloraxis_colorbar=dict(title="Cases"), 
                             height=600,
-                            map=dict(layers=[dict(sourcetype="raster", source=["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"])])
+                            # FIX: Added below="traces" to force the map under the data
+                            map=dict(layers=[dict(below="traces", sourcetype="raster", source=["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"])])
                         )
                         st.plotly_chart(
                             fig_map, 
@@ -1085,7 +1086,8 @@ def render_dengue():
                             margin={"r":0,"t":0,"l":0,"b":0}, 
                             coloraxis_colorbar=dict(title="Cases"), 
                             height=600,
-                            map=dict(layers=[dict(sourcetype="raster", source=["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"])])
+                            # FIX: Added below="traces" to force the map under the data
+                            map=dict(layers=[dict(below="traces", sourcetype="raster", source=["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"])])
                         )
                         st.plotly_chart(
                             fig_map, 
@@ -1458,7 +1460,8 @@ def render_tb():
                             margin={"r":0,"t":0,"l":0,"b":0}, 
                             coloraxis_colorbar=dict(title="Cases"), 
                             height=600,
-                            map=dict(layers=[dict(sourcetype="raster", source=["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"])])
+                            # FIX: Added below="traces" to force the map under the data
+                            map=dict(layers=[dict(below="traces", sourcetype="raster", source=["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"])])
                         )
                         st.plotly_chart(
                             fig_map, 
@@ -1520,7 +1523,8 @@ def render_tb():
                             margin={"r":0,"t":0,"l":0,"b":0}, 
                             coloraxis_colorbar=dict(title="Cases"), 
                             height=600,
-                            map=dict(layers=[dict(sourcetype="raster", source=["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"])])
+                            # FIX: Added below="traces" to force the map under the data
+                            map=dict(layers=[dict(below="traces", sourcetype="raster", source=["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"])])
                         )
                         st.plotly_chart(
                             fig_map, 
