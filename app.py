@@ -1445,10 +1445,12 @@ def render_tb():
                     color_discrete_sequence=["#facc15", "#3b82f6", "#ec4899", "#10b981", "#64748b"]
                 )
                 fig_ts.update_traces(textinfo='value')
+                
+                # FIXED: Corrected Plotly annotation syntax
                 fig_ts.update_layout(
                     height=380, 
                     margin=dict(t=40, b=10, l=10, r=10),
-                    annotations=[dict(text=f"{success_rate:.1f}%<br><span style='font-size:12px'>Success Rate</span>", x=0.5, y=0.5, font_size=20, showlabel=False, showarrow=False)]
+                    annotations=[dict(text=f"{success_rate:.1f}%<br><span style='font-size:12px'>Success Rate</span>", x=0.5, y=0.5, font=dict(size=20), showarrow=False)]
                 )
                 st.plotly_chart(fig_ts, use_container_width=True)
             else:
