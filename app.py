@@ -1417,22 +1417,16 @@ def render_tb():
                 st.error("HIV Data columns do not match the expected ITIS export format.")
         else: st.info(f"No HIV data available for {selected_year}.")
 
-    with tab4:
-        st.subheader("Geographic Heatmap" if muncity_input == "All Municipalities" else f"Geographic Heatmap: Barangays in {muncity_input}")
-        
-        brgy_col = "Barangay" if "Barangay" in filtered_df.columns else ("Brgy" if "Brgy" in filtered_df.columns else None)
-        
+    with tab6:
         if muncity_input != "All Municipalities":
+            st.subheader(f"Geographic Heatmap: Barangays in {muncity_input} ({selected_year})")
             brgy_geojson, err = fetch_barangay_geojson(muncity_input)
-            
-            if brgy_geojson and brgy_col:
+            if brgy_geojson and "Brgy" in df_combined.columns:
                 all_geojson_brgys = [f['properties']['Standard_Name'] for f in brgy_geojson['features']]
                 all_geojson_originals = [f['properties']['Original_Name'] for f in brgy_geojson['features']]
-                
                 base_df = pd.DataFrame({"Join_Key": all_geojson_brgys, "Barangay_Display": all_geojson_originals, "Base_Cases": 0})
-                
-                curr_cases = filtered_df.groupby(brgy_col).size().reset_index(name="Filtered_Cases")
-                curr_cases["Join_Key"] = curr_cases[brgy_col].apply(clean_brgy_name)
+                curr_cases = df_combined.groupby("Brgy").size().reset_index(name="Filtered_Cases")
+                curr_cases["Join_Key"] = curr_cases["Brgy"].apply(clean_brgy_name)
                 curr_cases = curr_cases.groupby("Join_Key")["Filtered_Cases"].sum().reset_index()
                 
                 map_data = pd.merge(base_df, curr_cases, on="Join_Key", how="left")
@@ -1454,7 +1448,6 @@ def render_tb():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
-                        # Direct CartoDB URL to bypass the API Key requirement
                         tiles_url = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                         m = folium.Map(location=[cam_lat, cam_lon], zoom_start=11.5, tiles=tiles_url, attr="CartoDB", scrollWheelZoom=False)
                         
@@ -1464,11 +1457,11 @@ def render_tb():
                             data=map_data,
                             columns=["Join_Key", "Total Cases"],
                             key_on="feature.properties.Standard_Name",
-                            fill_color="Reds",
+                            fill_color="Blues",
                             fill_opacity=0.85,
                             line_opacity=0.8,
                             line_color="gray",
-                            legend_name="Total Dengue Cases"
+                            legend_name="Total TB Cases"
                         ).add_to(m)
                         
                         for i in range(len(lons)):
@@ -1484,15 +1477,14 @@ def render_tb():
                             
                         st_folium(m, use_container_width=True, height=850, returned_objects=[])
                     except Exception as e:
-                        st.error(f"Folium encountered an internal error rendering the Barangay map: {e}")
-                else:
-                    st.warning("No geographic mapping data available for the selected filters.")
-            else:
-                st.error(err if err else "Barangay column missing in Dengue dataset (Expected 'Barangay').")
+                        st.error(f"Folium error rendering Barangay map: {e}")
+                else: st.warning("No geographic mapping data available for the selected filters.")
+            else: st.error(err if err else "Barangay column (Brgy) missing in data.")
                 
         else:
+            st.subheader(f"Geographic Heatmap: Municipalities in Abra ({selected_year})")
             base_df = pd.DataFrame({"Muncity": ALL_ABRA_MUNICIPALITIES, "Base_Cases": 0})
-            curr_cases = filtered_df.groupby("Muncity").size().reset_index(name="Filtered_Cases")
+            curr_cases = df_combined.groupby("Muncity").size().reset_index(name="Filtered_Cases")
             map_data = pd.merge(base_df, curr_cases, on="Muncity", how="left")
             map_data["Total Cases"] = map_data["Filtered_Cases"].fillna(0).astype(int)
             
@@ -1519,11 +1511,11 @@ def render_tb():
                             data=map_data,
                             columns=["Muncity", "Total Cases"],
                             key_on="feature.properties.Standard_Name",
-                            fill_color="Reds",
+                            fill_color="Blues",
                             fill_opacity=0.85,
                             line_opacity=0.8,
                             line_color="gray",
-                            legend_name="Total Dengue Cases"
+                            legend_name="Total TB Cases"
                         ).add_to(m)
                         
                         for i in range(len(lons)):
@@ -1532,7 +1524,6 @@ def render_tb():
                             town = texts[i].split('<br>')[0].upper()
                             
                             # --- NUDGE ALGORITHM FOR ABRA ---
-                            # Pushes overlapping text apart so we can use a readable 10.5pt font!
                             if "MANABO" in town: lat_val -= 0.015
                             elif "SALLAPADAN" in town: lat_val += 0.015
                             elif "BANGUED" in town: lon_val -= 0.02
@@ -1552,11 +1543,9 @@ def render_tb():
                             
                         st_folium(m, use_container_width=True, height=850, returned_objects=[])
                     except Exception as e:
-                        st.error(f"Folium encountered an internal error rendering the Municipality map: {e}")
-                else:
-                    st.warning("No geographic mapping data available for the selected filters.")
-            else:
-                st.error("Could not fetch the Abra geographic boundaries.")
+                        st.error(f"Folium error rendering Municipality map: {e}")
+                else: st.warning("No geographic mapping data available for the selected filters.")
+            else: st.error("Could not fetch the Abra geographic boundaries.")
 
     with tab7:
         st.subheader(f"Filtered TB Registry ({selected_year})")
