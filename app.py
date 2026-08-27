@@ -974,10 +974,6 @@ def render_dengue():
         
         brgy_col = "Barangay" if "Barangay" in filtered_df.columns else ("Brgy" if "Brgy" in filtered_df.columns else None)
         
-        # --- FREE ESRI TILE SERVER ---
-        tiles_url = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-        attr = "Esri"
-        
         if muncity_input != "All Municipalities":
             brgy_geojson, err = fetch_barangay_geojson(muncity_input)
             
@@ -1010,36 +1006,19 @@ def render_dengue():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
-                        m = folium.Map(location=[cam_lat, cam_lon], zoom_start=11.5, tiles=tiles_url, attr=attr, scrollWheelZoom=False)
-                        
-                        folium.Choropleth(
-                            geo_data=brgy_geojson,
-                            name="choropleth",
-                            data=map_data,
-                            columns=["Join_Key", "Total Cases"],
-                            key_on="feature.properties.Standard_Name",
-                            fill_color="Reds",
-                            fill_opacity=0.85,
-                            line_opacity=0.8,
-                            line_color="gray",
-                            legend_name="Total Dengue Cases"
-                        ).add_to(m)
-                        
-                        for i in range(len(lons)):
-                            # SMALLER FONT AND THINNER 1PX BORDER
-                            html_label = f'''
-                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 9pt; font-weight: bold; font-family: Arial; color: #000000; text-align: center; line-height: 1.1; text-shadow: -1px -1px 0 #ffffff, 1px -1px 0 #ffffff, -1px 1px 0 #ffffff, 1px 1px 0 #ffffff; white-space: nowrap; pointer-events: none;">
-                                    {texts[i]}
-                                </div>
-                            '''
-                            folium.map.Marker(
-                                [lats[i], lons[i]],
-                                icon=DivIcon(icon_size=(0, 0), icon_anchor=(0, 0), html=html_label)
-                            ).add_to(m)
-                            
-                        st_folium(m, use_container_width=True, height=850, returned_objects=[])
+                        fig_map = px.choropleth_mapbox(
+                            map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
+                            color='Total Cases', color_continuous_scale="Reds", mapbox_style="carto-positron",
+                            zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.7, hover_name='Barangay_Display',
+                            hover_data={'Join_Key': False, 'Total Cases': ':,', 'Barangay_Display': False}
+                        )
+                        fig_map.add_trace(go.Scattermapbox(
+                            lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color='black'), hoverinfo='skip', showlegend=False
+                        ))
+                        fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, coloraxis_colorbar=dict(title="Cases"), height=600)
+                        st.plotly_chart(fig_map, use_container_width=True)
                     except Exception as e:
-                        st.error(f"Folium encountered an internal error rendering the Barangay map: {e}")
+                        st.error(f"Plotly encountered an internal error rendering the Barangay map: {e}")
                 else:
                     st.warning("No geographic mapping data available for the selected filters.")
             else:
@@ -1065,47 +1044,19 @@ def render_dengue():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
-                        m = folium.Map(location=[17.58, 120.83], zoom_start=9.5, tiles=tiles_url, attr=attr, scrollWheelZoom=False)
-                        
-                        folium.Choropleth(
-                            geo_data=abra_geojson,
-                            name="choropleth",
-                            data=map_data,
-                            columns=["Muncity", "Total Cases"],
-                            key_on="feature.properties.Standard_Name",
-                            fill_color="Reds",
-                            fill_opacity=0.85,
-                            line_opacity=0.8,
-                            line_color="gray",
-                            legend_name="Total Dengue Cases"
-                        ).add_to(m)
-                        
-                        for i in range(len(lons)):
-                            lat_val = lats[i]
-                            lon_val = lons[i]
-                            town = texts[i].split('<br>')[0].upper()
-                            
-                            # NUDGE ALGORITHM FOR ABRA
-                            if "MANABO" in town: lat_val -= 0.015
-                            elif "SALLAPADAN" in town: lat_val += 0.015
-                            elif "BANGUED" in town: lon_val -= 0.02
-                            elif "PEÑARRUBIA" in town: lon_val += 0.02
-                            elif "LANGIDEN" in town: lon_val -= 0.015
-                            elif "PIDIGAN" in town: lon_val -= 0.015
-                            
-                            html_label = f'''
-                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 9pt; font-weight: bold; font-family: Arial; color: #000000; text-align: center; line-height: 1.1; text-shadow: -1px -1px 0 #ffffff, 1px -1px 0 #ffffff, -1px 1px 0 #ffffff, 1px 1px 0 #ffffff; white-space: nowrap; pointer-events: none;">
-                                    {texts[i]}
-                                </div>
-                            '''
-                            folium.map.Marker(
-                                [lat_val, lon_val],
-                                icon=DivIcon(icon_size=(0, 0), icon_anchor=(0, 0), html=html_label)
-                            ).add_to(m)
-                            
-                        st_folium(m, use_container_width=True, height=850, returned_objects=[])
+                        fig_map = px.choropleth_mapbox(
+                            map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
+                            color='Total Cases', color_continuous_scale="Reds", mapbox_style="carto-positron",
+                            zoom=9.2, center={"lat": 17.58, "lon": 120.80}, opacity=0.7, hover_name='Muncity',
+                            hover_data={'Muncity': False, 'Total Cases': ':,'}
+                        )
+                        fig_map.add_trace(go.Scattermapbox(
+                            lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color='black'), hoverinfo='skip', showlegend=False
+                        ))
+                        fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, coloraxis_colorbar=dict(title="Cases"), height=600)
+                        st.plotly_chart(fig_map, use_container_width=True)
                     except Exception as e:
-                        st.error(f"Folium encountered an internal error rendering the Municipality map: {e}")
+                        st.error(f"Plotly encountered an internal error rendering the Municipality map: {e}")
                 else:
                     st.warning("No geographic mapping data available for the selected filters.")
             else:
@@ -1419,10 +1370,6 @@ def render_tb():
         else: st.info(f"No HIV data available for {selected_year}.")
 
     with tab6:
-        # --- FREE ESRI TILE SERVER ---
-        tiles_url = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-        attr = "Esri"
-
         if muncity_input != "All Municipalities":
             st.subheader(f"Geographic Heatmap: Barangays in {muncity_input} ({selected_year})")
             brgy_geojson, err = fetch_barangay_geojson(muncity_input)
@@ -1453,35 +1400,19 @@ def render_tb():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
-                        m = folium.Map(location=[cam_lat, cam_lon], zoom_start=11.5, tiles=tiles_url, attr=attr, scrollWheelZoom=False)
-                        
-                        folium.Choropleth(
-                            geo_data=brgy_geojson,
-                            name="choropleth",
-                            data=map_data,
-                            columns=["Join_Key", "Total Cases"],
-                            key_on="feature.properties.Standard_Name",
-                            fill_color="Blues",
-                            fill_opacity=0.85,
-                            line_opacity=0.8,
-                            line_color="gray",
-                            legend_name="Total TB Cases"
-                        ).add_to(m)
-                        
-                        for i in range(len(lons)):
-                            html_label = f'''
-                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 9pt; font-weight: bold; font-family: Arial; color: #000000; text-align: center; line-height: 1.1; text-shadow: -1px -1px 0 #ffffff, 1px -1px 0 #ffffff, -1px 1px 0 #ffffff, 1px 1px 0 #ffffff; white-space: nowrap; pointer-events: none;">
-                                    {texts[i]}
-                                </div>
-                            '''
-                            folium.map.Marker(
-                                [lats[i], lons[i]],
-                                icon=DivIcon(icon_size=(0, 0), icon_anchor=(0, 0), html=html_label)
-                            ).add_to(m)
-                            
-                        st_folium(m, use_container_width=True, height=850, returned_objects=[])
+                        fig_map = px.choropleth_mapbox(
+                            map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
+                            color='Total Cases', color_continuous_scale="Blues", mapbox_style="carto-positron",
+                            zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.7, hover_name='Barangay_Display',
+                            hover_data={'Join_Key': False, 'Total Cases': ':,', 'Barangay_Display': False}
+                        )
+                        fig_map.add_trace(go.Scattermapbox(
+                            lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color='black'), hoverinfo='skip', showlegend=False
+                        ))
+                        fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, coloraxis_colorbar=dict(title="Cases"), height=600)
+                        st.plotly_chart(fig_map, use_container_width=True)
                     except Exception as e:
-                        st.error(f"Folium error rendering Barangay map: {e}")
+                        st.error(f"Plotly error rendering Barangay map: {e}")
                 else: st.warning("No geographic mapping data available for the selected filters.")
             else: st.error(err if err else "Barangay column (Brgy) missing in data.")
                 
@@ -1506,47 +1437,19 @@ def render_tb():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
-                        m = folium.Map(location=[17.58, 120.83], zoom_start=9.5, tiles=tiles_url, attr=attr, scrollWheelZoom=False)
-                        
-                        folium.Choropleth(
-                            geo_data=abra_geojson,
-                            name="choropleth",
-                            data=map_data,
-                            columns=["Muncity", "Total Cases"],
-                            key_on="feature.properties.Standard_Name",
-                            fill_color="Blues",
-                            fill_opacity=0.85,
-                            line_opacity=0.8,
-                            line_color="gray",
-                            legend_name="Total TB Cases"
-                        ).add_to(m)
-                        
-                        for i in range(len(lons)):
-                            lat_val = lats[i]
-                            lon_val = lons[i]
-                            town = texts[i].split('<br>')[0].upper()
-                            
-                            # NUDGE ALGORITHM FOR ABRA
-                            if "MANABO" in town: lat_val -= 0.015
-                            elif "SALLAPADAN" in town: lat_val += 0.015
-                            elif "BANGUED" in town: lon_val -= 0.02
-                            elif "PEÑARRUBIA" in town: lon_val += 0.02
-                            elif "LANGIDEN" in town: lon_val -= 0.015
-                            elif "PIDIGAN" in town: lon_val -= 0.015
-                            
-                            html_label = f'''
-                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 9pt; font-weight: bold; font-family: Arial; color: #000000; text-align: center; line-height: 1.1; text-shadow: -1px -1px 0 #ffffff, 1px -1px 0 #ffffff, -1px 1px 0 #ffffff, 1px 1px 0 #ffffff; white-space: nowrap; pointer-events: none;">
-                                    {texts[i]}
-                                </div>
-                            '''
-                            folium.map.Marker(
-                                [lat_val, lon_val],
-                                icon=DivIcon(icon_size=(0, 0), icon_anchor=(0, 0), html=html_label)
-                            ).add_to(m)
-                            
-                        st_folium(m, use_container_width=True, height=850, returned_objects=[])
+                        fig_map = px.choropleth_mapbox(
+                            map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
+                            color='Total Cases', color_continuous_scale="Blues", mapbox_style="carto-positron",
+                            zoom=9.2, center={"lat": 17.58, "lon": 120.80}, opacity=0.7, hover_name='Muncity',
+                            hover_data={'Muncity': False, 'Total Cases': ':,'}
+                        )
+                        fig_map.add_trace(go.Scattermapbox(
+                            lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color='black'), hoverinfo='skip', showlegend=False
+                        ))
+                        fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, coloraxis_colorbar=dict(title="Cases"), height=600)
+                        st.plotly_chart(fig_map, use_container_width=True)
                     except Exception as e:
-                        st.error(f"Folium error rendering Municipality map: {e}")
+                        st.error(f"Plotly error rendering Municipality map: {e}")
                 else: st.warning("No geographic mapping data available for the selected filters.")
             else: st.error("Could not fetch the Abra geographic boundaries.")
 
