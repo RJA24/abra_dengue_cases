@@ -1029,9 +1029,11 @@ def render_dengue():
                         
                         fig_map.update_layout(
                             map_style=style_map[map_style_choice],
-                            map_zoom=11.5,
+                            map_zoom=9.5, # Adjust zoom slightly for portrait
                             map_center={"lat": cam_lat, "lon": cam_lon},
-                            margin={"r":0,"t":20,"l":0,"b":0}, height=850
+                            margin={"r":0,"t":20,"l":0,"b":0}, 
+                            width=600,    # 3x5 Portrait Width
+                            height=1000   # 3x5 Portrait Height
                         )
                         
                         if map_style_choice == "Satellite":
@@ -1086,9 +1088,11 @@ def render_dengue():
                         
                         fig_map.update_layout(
                             map_style=style_map[map_style_choice],
-                            map_zoom=8.8,
-                            map_center={"lat": 17.58, "lon": 120.83},
-                            margin={"r":0,"t":20,"l":0,"b":0}, height=850
+                            map_zoom=9.5, # Adjust zoom slightly for portrait
+                            map_center={"lat": cam_lat, "lon": cam_lon},
+                            margin={"r":0,"t":20,"l":0,"b":0}, 
+                            width=600,    # 3x5 Portrait Width
+                            height=1000   # 3x5 Portrait Height
                         )
                         
                         if map_style_choice == "Satellite":
@@ -1474,8 +1478,8 @@ def render_tb():
                             attr = "CartoDB"
                             text_col, outline_col = "black", "white"
                             
-                        # 2. Initialize the Canvas
-                        m = folium.Map(location=[17.58, 120.83], zoom_start=9.2, tiles=tiles, attr=attr)
+                        # 2. Initialize the Canvas (Zoom adjusted for Portrait)
+                        m = folium.Map(location=[17.58, 120.83], zoom_start=9.5, tiles=tiles, attr=attr)
                         
                         # 3. Draw the Choropleth Polygons
                         folium.Choropleth(
@@ -1491,35 +1495,35 @@ def render_tb():
                             legend_name="Total TB Cases"
                         ).add_to(m)
                         
-                        # 4. INJECT HTML LABELS (Forces 100% Visibility)
+                        # 4. INJECT HTML LABELS (Forces 100% Visibility - NO CLIPPING)
                         for i in range(len(lons)):
-                            # Use inline-block so the div tightly hugs the text, preventing invisible overlaps
                             html_label = f'''
-                                <div style="display: inline-block; font-size: 11pt; font-weight: bold; font-family: Arial; color: {text_col}; text-align: center; line-height: 1.1; 
-                                text-shadow: -1.5px -1.5px 0 {outline_col}, 1.5px -1.5px 0 {outline_col}, -1.5px 1.5px 0 {outline_col}, 1.5px 1.5px 0 {outline_col}; white-space: nowrap;">
+                                <div style="display: inline-block; font-size: 10pt; font-weight: bold; font-family: Arial; color: {text_col}; text-align: center; line-height: 1.1; 
+                                text-shadow: -1.5px -1.5px 0 {outline_col}, 1.5px -1.5px 0 {outline_col}, -1.5px 1.5px 0 {outline_col}, 1.5px 1.5px 0 {outline_col}; white-space: nowrap; overflow: visible;">
                                     {texts[i]}
                                 </div>
                             '''
                             folium.map.Marker(
                                 [lats[i], lons[i]],
                                 icon=DivIcon(
-                                    # Shrink the physical icon boundary to be incredibly small so they don't block each other
-                                    icon_size=(10, 10), 
-                                    icon_anchor=(0, 0), # Centers the div natively based on text size
+                                    icon_size=(0, 0), # Absolute zero size prevents all collision clipping!
+                                    icon_anchor=(0, 0), 
                                     html=html_label,
-                                    # Give it a CSS class to center transform it perfectly over the coordinate
                                     class_name="custom-div-icon" 
                                 )
                             ).add_to(m)
                             
                         # Inject CSS to center the DivIcon exactly over the anchor point
-                        m.get_root().html.add_child(folium.Element("<style>.custom-div-icon { transform: translate(-50%, -50%); }</style>"))
-                            
-                        # 5. Render to Streamlit without triggering reruns
-                        st_folium(m, use_container_width=True, height=850, returned_objects=[])
+                        m.get_root().html.add_child(folium.Element("<style>.custom-div-icon { transform: translate(-50%, -50%); overflow: visible !important; }</style>"))
+                        
+                        # 5. Render to Streamlit in a 3x5 Portrait Container
+                        col_space1, col_map, col_space2 = st.columns([1, 2, 1]) # Centers the map
+                        with col_map:
+                            st_folium(m, width=600, height=1000, returned_objects=[])
                         
                     except Exception as e:
                         st.error(f"Folium encountered an error rendering the map: {e}")
+                        
                 else: st.warning("No geographic mapping data available for the selected filters.")
             else: st.error(err if err else "Barangay column (Brgy) missing in data.")
                 
