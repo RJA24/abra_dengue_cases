@@ -369,7 +369,7 @@ def apply_label_nudges(muni_name, lat, lon):
         lat -= 0.01
         lon += 0.01
     elif "PIDIGAN" in name:
-        lon -= 0.015
+        pass
     elif "PILAR" in name:
         lat -= 0.015
         lon -= 0.015
