@@ -1029,17 +1029,18 @@ def render_dengue():
                         
                         fig_map.update_layout(
                             map_style=style_map[map_style_choice],
-                            map_zoom=9.5, # Adjust zoom slightly for portrait
+                            map_zoom=11.5,
                             map_center={"lat": cam_lat, "lon": cam_lon},
                             margin={"r":0,"t":20,"l":0,"b":0}, 
-                            width=600,    # 3x5 Portrait Width
-                            height=1000   # 3x5 Portrait Height
+                            height=850
                         )
                         
                         if map_style_choice == "Satellite":
                             fig_map.update_layout(map_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
                         
                         fig_map.add_trace(go.Scattermap(lon=lons, lat=lats, mode='markers+text', text=texts, textposition='middle center',textfont=dict(size=12, color=label_color), marker=dict(allowoverlap=True, size=0, opacity=0), hoverinfo='skip', showlegend=False))
+                        
+                        # Removed the columns, letting it stretch fully!
                         st.plotly_chart(fig_map, use_container_width=True, config={'scrollZoom': False})
                     except Exception as e:
                         st.error(f"Plotly encountered an internal error rendering the Barangay map: {e}")
@@ -1088,11 +1089,10 @@ def render_dengue():
                         
                         fig_map.update_layout(
                             map_style=style_map[map_style_choice],
-                            map_zoom=8.5,
-                            map_center={"lat": 17.58, "lon": 120.83}, # Fixed Abra coordinates
+                            map_zoom=9.0, # Looks best on full screen
+                            map_center={"lat": 17.58, "lon": 120.83}, 
                             margin={"r":0,"t":20,"l":0,"b":0}, 
-                            width=1500, 
-                            height=700 
+                            height=850
                         )
                         
                         if map_style_choice == "Satellite":
@@ -1100,22 +1100,19 @@ def render_dengue():
 
                         fig_map.add_trace(go.Scattermap(lon=lons, lat=lats, mode='markers+text', text=texts, textposition='middle center',textfont=dict(size=12, color=label_color), marker=dict(allowoverlap=True, size=0, opacity=0), hoverinfo='skip', showlegend=False))
                         
-                        col_space1, col_map, col_space2 = st.columns([1, 2, 1])
-                        with col_map:
-                            st.plotly_chart(
-                                fig_map, 
-                                use_container_width=False, 
-                                config={
-                                    'scrollZoom': False,
-                                    'toImageButtonOptions': {
-                                        'format': 'png', 
-                                        'filename': 'Abra_Choropleth_Map',
-                                        'height': 700,
-                                        'width': 1500,
-                                        'scale': 3
-                                    }
+                        # Removed the columns, letting it stretch fully!
+                        st.plotly_chart(
+                            fig_map, 
+                            use_container_width=True, 
+                            config={
+                                'scrollZoom': False,
+                                'toImageButtonOptions': {
+                                    'format': 'png', 
+                                    'filename': 'Abra_Choropleth_Map',
+                                    'scale': 3 # Keeps the high-res download
                                 }
-                            )
+                            }
+                        )
                     except Exception as e:
                         st.error(f"Plotly encountered an internal error rendering the Municipality map: {e}")
                 else:
@@ -1522,7 +1519,7 @@ def render_tb():
                         # 5. Render to Streamlit in a 3x5 Portrait Container
                         col_space1, col_map, col_space2 = st.columns([1, 2, 1])
                         with col_map:
-                            st.plotly_chart(fig_map, use_container_width=False, config={'scrollZoom': False})
+                            st.folium_chart(fig_map, use_container_width=False, config={'scrollZoom': False})
                         
                     except Exception as e:
                         st.error(f"Folium encountered an error rendering the map: {e}")
