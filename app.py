@@ -1091,7 +1091,7 @@ def render_dengue():
                             map_zoom=8.5,
                             map_center={"lat": 17.58, "lon": 120.83}, # Fixed Abra coordinates
                             margin={"r":0,"t":20,"l":0,"b":0}, 
-                            width=900, 
+                            width=1000, 
                             height=700 
                         )
                         
@@ -1111,7 +1111,7 @@ def render_dengue():
                                         'format': 'png', 
                                         'filename': 'Abra_Choropleth_Map',
                                         'height': 700,
-                                        'width': 900,
+                                        'width': 1000,
                                         'scale': 3
                                     }
                                 }
