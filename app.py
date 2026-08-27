@@ -345,7 +345,7 @@ def apply_label_nudges(muni_name, lat, lon):
     elif "DOLORES" in name:
         pass
     elif "LA PAZ" in name:
-        pass
+        lat -= 0.015
     elif "LACUB" in name:
         pass
     elif "LAGANGILANG" in name:
@@ -379,11 +379,11 @@ def apply_label_nudges(muni_name, lat, lon):
     elif "SAN ISIDRO" in name:
         lon -= 0.015
     elif "SAN JUAN" in name:
-        pass
+        lon += 0.015
     elif "SAN QUINTIN" in name:
         pass
     elif "TAYUM" in name:
-        pass
+        lat -= 0.015
     elif "TINEG" in name:
         pass
     elif "TUBO" in name:
