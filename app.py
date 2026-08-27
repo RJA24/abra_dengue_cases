@@ -1517,9 +1517,9 @@ def render_tb():
                         m.get_root().html.add_child(folium.Element("<style>.custom-div-icon { transform: translate(-50%, -50%); overflow: visible !important; }</style>"))
                         
                         # 5. Render to Streamlit in a 3x5 Portrait Container
-                        col_space1, col_map, col_space2 = st.columns([1, 2, 1]) # Centers the map
+                        col_space1, col_map, col_space2 = st.columns([1, 2, 1])
                         with col_map:
-                            st_folium(m, width=600, height=1000, returned_objects=[])
+                            st.plotly_chart(fig_map, use_container_width=False, config={'scrollZoom': False})
                         
                     except Exception as e:
                         st.error(f"Folium encountered an error rendering the map: {e}")
