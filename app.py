@@ -1006,8 +1006,9 @@ def render_dengue():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
-                        # Initialize clean white-bg Folium Map with scroll zooming disabled
-                        m = folium.Map(location=[cam_lat, cam_lon], zoom_start=11.5, tiles="CartoDB positron", scrollWheelZoom=False)
+                        # Direct CartoDB URL to bypass the API Key requirement
+                        tiles_url = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                        m = folium.Map(location=[cam_lat, cam_lon], zoom_start=11.5, tiles=tiles_url, attr="CartoDB", scrollWheelZoom=False)
                         
                         folium.Choropleth(
                             geo_data=brgy_geojson,
@@ -1022,10 +1023,9 @@ def render_dengue():
                             legend_name="Total Dengue Cases"
                         ).add_to(m)
                         
-                        # INJECT BULLETPROOF HTML LABELS
                         for i in range(len(lons)):
                             html_label = f'''
-                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 11pt; font-weight: bold; font-family: Arial; color: black; text-align: center; line-height: 1.1; text-shadow: -1.5px -1.5px 0 white, 1.5px -1.5px 0 white, -1.5px 1.5px 0 white, 1.5px 1.5px 0 white; white-space: nowrap; pointer-events: none;">
+                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 10.5pt; font-weight: bold; font-family: Arial; color: #000000; text-align: center; line-height: 1.1; text-shadow: -1.5px -1.5px 0 #ffffff, 1.5px -1.5px 0 #ffffff, -1.5px 1.5px 0 #ffffff, 1.5px 1.5px 0 #ffffff; white-space: nowrap; pointer-events: none;">
                                     {texts[i]}
                                 </div>
                             '''
@@ -1062,8 +1062,8 @@ def render_dengue():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
-                        # Initialize clean white-bg Folium Map with scroll zooming disabled
-                        m = folium.Map(location=[17.58, 120.83], zoom_start=9.5, tiles="CartoDB positron", scrollWheelZoom=False)
+                        tiles_url = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                        m = folium.Map(location=[17.58, 120.83], zoom_start=9.5, tiles=tiles_url, attr="CartoDB", scrollWheelZoom=False)
                         
                         folium.Choropleth(
                             geo_data=abra_geojson,
@@ -1078,15 +1078,27 @@ def render_dengue():
                             legend_name="Total Dengue Cases"
                         ).add_to(m)
                         
-                        # INJECT BULLETPROOF HTML LABELS
                         for i in range(len(lons)):
+                            lat_val = lats[i]
+                            lon_val = lons[i]
+                            town = texts[i].split('<br>')[0].upper()
+                            
+                            # --- NUDGE ALGORITHM FOR ABRA ---
+                            # Pushes overlapping text apart so we can use a readable 10.5pt font!
+                            if "MANABO" in town: lat_val -= 0.015
+                            elif "SALLAPADAN" in town: lat_val += 0.015
+                            elif "BANGUED" in town: lon_val -= 0.02
+                            elif "PEÑARRUBIA" in town: lon_val += 0.02
+                            elif "LANGIDEN" in town: lon_val -= 0.015
+                            elif "PIDIGAN" in town: lon_val -= 0.015
+                            
                             html_label = f'''
-                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 11pt; font-weight: bold; font-family: Arial; color: black; text-align: center; line-height: 1.1; text-shadow: -1.5px -1.5px 0 white, 1.5px -1.5px 0 white, -1.5px 1.5px 0 white, 1.5px 1.5px 0 white; white-space: nowrap; pointer-events: none;">
+                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 10.5pt; font-weight: bold; font-family: Arial; color: #000000; text-align: center; line-height: 1.1; text-shadow: -1.5px -1.5px 0 #ffffff, 1.5px -1.5px 0 #ffffff, -1.5px 1.5px 0 #ffffff, 1.5px 1.5px 0 #ffffff; white-space: nowrap; pointer-events: none;">
                                     {texts[i]}
                                 </div>
                             '''
                             folium.map.Marker(
-                                [lats[i], lons[i]],
+                                [lat_val, lon_val],
                                 icon=DivIcon(icon_size=(0, 0), icon_anchor=(0, 0), html=html_label)
                             ).add_to(m)
                             
@@ -1405,16 +1417,22 @@ def render_tb():
                 st.error("HIV Data columns do not match the expected ITIS export format.")
         else: st.info(f"No HIV data available for {selected_year}.")
 
-    with tab6:
+    with tab4:
+        st.subheader("Geographic Heatmap" if muncity_input == "All Municipalities" else f"Geographic Heatmap: Barangays in {muncity_input}")
+        
+        brgy_col = "Barangay" if "Barangay" in filtered_df.columns else ("Brgy" if "Brgy" in filtered_df.columns else None)
+        
         if muncity_input != "All Municipalities":
-            st.subheader(f"Geographic Heatmap: Barangays in {muncity_input} ({selected_year})")
             brgy_geojson, err = fetch_barangay_geojson(muncity_input)
-            if brgy_geojson and "Brgy" in df_combined.columns:
+            
+            if brgy_geojson and brgy_col:
                 all_geojson_brgys = [f['properties']['Standard_Name'] for f in brgy_geojson['features']]
                 all_geojson_originals = [f['properties']['Original_Name'] for f in brgy_geojson['features']]
+                
                 base_df = pd.DataFrame({"Join_Key": all_geojson_brgys, "Barangay_Display": all_geojson_originals, "Base_Cases": 0})
-                curr_cases = df_combined.groupby("Brgy").size().reset_index(name="Filtered_Cases")
-                curr_cases["Join_Key"] = curr_cases["Brgy"].apply(clean_brgy_name)
+                
+                curr_cases = filtered_df.groupby(brgy_col).size().reset_index(name="Filtered_Cases")
+                curr_cases["Join_Key"] = curr_cases[brgy_col].apply(clean_brgy_name)
                 curr_cases = curr_cases.groupby("Join_Key")["Filtered_Cases"].sum().reset_index()
                 
                 map_data = pd.merge(base_df, curr_cases, on="Join_Key", how="left")
@@ -1436,8 +1454,9 @@ def render_tb():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
-                        # Initialize clean white-bg Folium Map with scroll zooming disabled
-                        m = folium.Map(location=[cam_lat, cam_lon], zoom_start=11.5, tiles="CartoDB positron", scrollWheelZoom=False)
+                        # Direct CartoDB URL to bypass the API Key requirement
+                        tiles_url = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                        m = folium.Map(location=[cam_lat, cam_lon], zoom_start=11.5, tiles=tiles_url, attr="CartoDB", scrollWheelZoom=False)
                         
                         folium.Choropleth(
                             geo_data=brgy_geojson,
@@ -1445,17 +1464,16 @@ def render_tb():
                             data=map_data,
                             columns=["Join_Key", "Total Cases"],
                             key_on="feature.properties.Standard_Name",
-                            fill_color="Blues",
+                            fill_color="Reds",
                             fill_opacity=0.85,
                             line_opacity=0.8,
                             line_color="gray",
-                            legend_name="Total TB Cases"
+                            legend_name="Total Dengue Cases"
                         ).add_to(m)
                         
-                        # INJECT BULLETPROOF HTML LABELS
                         for i in range(len(lons)):
                             html_label = f'''
-                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 11pt; font-weight: bold; font-family: Arial; color: black; text-align: center; line-height: 1.1; text-shadow: -1.5px -1.5px 0 white, 1.5px -1.5px 0 white, -1.5px 1.5px 0 white, 1.5px 1.5px 0 white; white-space: nowrap; pointer-events: none;">
+                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 10.5pt; font-weight: bold; font-family: Arial; color: #000000; text-align: center; line-height: 1.1; text-shadow: -1.5px -1.5px 0 #ffffff, 1.5px -1.5px 0 #ffffff, -1.5px 1.5px 0 #ffffff, 1.5px 1.5px 0 #ffffff; white-space: nowrap; pointer-events: none;">
                                     {texts[i]}
                                 </div>
                             '''
@@ -1466,14 +1484,15 @@ def render_tb():
                             
                         st_folium(m, use_container_width=True, height=850, returned_objects=[])
                     except Exception as e:
-                        st.error(f"Folium error rendering Barangay map: {e}")
-                else: st.warning("No geographic mapping data available for the selected filters.")
-            else: st.error(err if err else "Barangay column (Brgy) missing in data.")
+                        st.error(f"Folium encountered an internal error rendering the Barangay map: {e}")
+                else:
+                    st.warning("No geographic mapping data available for the selected filters.")
+            else:
+                st.error(err if err else "Barangay column missing in Dengue dataset (Expected 'Barangay').")
                 
         else:
-            st.subheader(f"Geographic Heatmap: Municipalities in Abra ({selected_year})")
             base_df = pd.DataFrame({"Muncity": ALL_ABRA_MUNICIPALITIES, "Base_Cases": 0})
-            curr_cases = df_combined.groupby("Muncity").size().reset_index(name="Filtered_Cases")
+            curr_cases = filtered_df.groupby("Muncity").size().reset_index(name="Filtered_Cases")
             map_data = pd.merge(base_df, curr_cases, on="Muncity", how="left")
             map_data["Total Cases"] = map_data["Filtered_Cases"].fillna(0).astype(int)
             
@@ -1491,8 +1510,8 @@ def render_tb():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
-                        # Initialize clean white-bg Folium Map with scroll zooming disabled
-                        m = folium.Map(location=[17.58, 120.83], zoom_start=9.5, tiles="CartoDB positron", scrollWheelZoom=False)
+                        tiles_url = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                        m = folium.Map(location=[17.58, 120.83], zoom_start=9.5, tiles=tiles_url, attr="CartoDB", scrollWheelZoom=False)
                         
                         folium.Choropleth(
                             geo_data=abra_geojson,
@@ -1500,30 +1519,44 @@ def render_tb():
                             data=map_data,
                             columns=["Muncity", "Total Cases"],
                             key_on="feature.properties.Standard_Name",
-                            fill_color="Blues",
+                            fill_color="Reds",
                             fill_opacity=0.85,
                             line_opacity=0.8,
                             line_color="gray",
-                            legend_name="Total TB Cases"
+                            legend_name="Total Dengue Cases"
                         ).add_to(m)
                         
-                        # INJECT BULLETPROOF HTML LABELS
                         for i in range(len(lons)):
+                            lat_val = lats[i]
+                            lon_val = lons[i]
+                            town = texts[i].split('<br>')[0].upper()
+                            
+                            # --- NUDGE ALGORITHM FOR ABRA ---
+                            # Pushes overlapping text apart so we can use a readable 10.5pt font!
+                            if "MANABO" in town: lat_val -= 0.015
+                            elif "SALLAPADAN" in town: lat_val += 0.015
+                            elif "BANGUED" in town: lon_val -= 0.02
+                            elif "PEÑARRUBIA" in town: lon_val += 0.02
+                            elif "LANGIDEN" in town: lon_val -= 0.015
+                            elif "PIDIGAN" in town: lon_val -= 0.015
+                            
                             html_label = f'''
-                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 11pt; font-weight: bold; font-family: Arial; color: black; text-align: center; line-height: 1.1; text-shadow: -1.5px -1.5px 0 white, 1.5px -1.5px 0 white, -1.5px 1.5px 0 white, 1.5px 1.5px 0 white; white-space: nowrap; pointer-events: none;">
+                                <div style="position: absolute; transform: translate(-50%, -50%); font-size: 10.5pt; font-weight: bold; font-family: Arial; color: #000000; text-align: center; line-height: 1.1; text-shadow: -1.5px -1.5px 0 #ffffff, 1.5px -1.5px 0 #ffffff, -1.5px 1.5px 0 #ffffff, 1.5px 1.5px 0 #ffffff; white-space: nowrap; pointer-events: none;">
                                     {texts[i]}
                                 </div>
                             '''
                             folium.map.Marker(
-                                [lats[i], lons[i]],
+                                [lat_val, lon_val],
                                 icon=DivIcon(icon_size=(0, 0), icon_anchor=(0, 0), html=html_label)
                             ).add_to(m)
                             
                         st_folium(m, use_container_width=True, height=850, returned_objects=[])
                     except Exception as e:
-                        st.error(f"Folium error rendering Municipality map: {e}")
-                else: st.warning("No geographic mapping data available for the selected filters.")
-            else: st.error("Could not fetch the Abra geographic boundaries.")
+                        st.error(f"Folium encountered an internal error rendering the Municipality map: {e}")
+                else:
+                    st.warning("No geographic mapping data available for the selected filters.")
+            else:
+                st.error("Could not fetch the Abra geographic boundaries.")
 
     with tab7:
         st.subheader(f"Filtered TB Registry ({selected_year})")
