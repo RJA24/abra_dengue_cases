@@ -371,7 +371,8 @@ def apply_label_nudges(muni_name, lat, lon):
         lat -= 0.015
         lon -= 0.015
     elif "SALLAPADAN" in name:
-        lat += 0.015
+        lat += 0.025
+        lon += 0.015
     elif "SAN ISIDRO" in name:
         lon -= 0.015
     elif "SAN JUAN" in name:
