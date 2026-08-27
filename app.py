@@ -349,10 +349,12 @@ def apply_label_nudges(muni_name, lat, lon):
     elif "LACUB" in name:
         pass
     elif "LAGANGILANG" in name:
-        pass
+        lat -= 0.015
+        lon += 0.02
     elif "LAGAYAN" in name:
         pass
     elif "LANGIDEN" in name:
+        lat += 0.015
         lon -= 0.015
     elif "LICUAN-BAAY" in name:
         pass
@@ -364,7 +366,7 @@ def apply_label_nudges(muni_name, lat, lon):
         lat -= 0.015
         lon -= 0.015
     elif "PEÑARRUBIA" in name:
-        lon += 0.02
+        lon -= 0.02
     elif "PIDIGAN" in name:
         lat -= 0.015
         lon += 0.015
@@ -387,7 +389,7 @@ def apply_label_nudges(muni_name, lat, lon):
     elif "TUBO" in name:
         pass
     elif "VILLAVICIOSA" in name:
-        pass
+        lon += 0.015
         
     return float(lat), float(lon)
 
