@@ -1006,17 +1006,34 @@ def render_dengue():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
+                        max_val = max(1, int(map_data["Total Cases"].max()))
+                        
                         fig_map = px.choropleth_map(
                             map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
-                            color='Total Cases', color_continuous_scale="Reds", map_style="white-bg",
+                            color='Total Cases', color_continuous_scale="Reds", range_color=[0, max_val], map_style="white-bg",
                             zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.7, hover_name='Barangay_Display',
                             hover_data={'Join_Key': False, 'Total Cases': ':,', 'Barangay_Display': False}
                         )
                         fig_map.add_trace(go.Scattermap(
-                            lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color='black'), hoverinfo='skip', showlegend=False
+                            lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=9, color='black'), hoverinfo='skip', showlegend=False
                         ))
-                        fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, coloraxis_colorbar=dict(title="Cases"), height=600)
-                        st.plotly_chart(fig_map, use_container_width=True)
+                        fig_map.update_layout(
+                            dragmode=False,
+                            margin={"r":0,"t":0,"l":0,"b":0}, 
+                            coloraxis_colorbar=dict(title="Cases"), 
+                            height=600,
+                            map=dict(layers=[dict(sourcetype="raster", source=["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"])])
+                        )
+                        st.plotly_chart(
+                            fig_map, 
+                            use_container_width=True,
+                            key="dengue_brgy_map",
+                            config={
+                                'scrollZoom': False, 
+                                'displayModeBar': True, 
+                                'toImageButtonOptions': {'format': 'png', 'filename': f'Dengue_Map_{muncity_input}', 'scale': 2}
+                            }
+                        )
                     except Exception as e:
                         st.error(f"Plotly encountered an internal error rendering the Barangay map: {e}")
                 else:
@@ -1039,22 +1056,47 @@ def render_dengue():
                     cases = match['Total Cases'].values[0] if not match.empty else 0
                     lon, lat = get_polygon_centroid(feat['geometry'])
                     if lon is not None and lat is not None:
+                        # --- NUDGE ALGORITHM FOR ABRA ---
+                        if "MANABO" in std_name.upper(): lat -= 0.015
+                        elif "SALLAPADAN" in std_name.upper(): lat += 0.015
+                        elif "BANGUED" in std_name.upper(): lon -= 0.02
+                        elif "PEÑARRUBIA" in std_name.upper(): lon += 0.02
+                        elif "LANGIDEN" in std_name.upper(): lon -= 0.015
+                        elif "PIDIGAN" in std_name.upper(): lon -= 0.015
+                        
                         lons.append(float(lon)); lats.append(float(lat))
                         texts.append(f"{std_name.title()}<br>{int(cases)}")
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
+                        max_val = max(1, int(map_data["Total Cases"].max()))
+                        
                         fig_map = px.choropleth_map(
                             map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
-                            color='Total Cases', color_continuous_scale="Reds", map_style="white-bg",
+                            color='Total Cases', color_continuous_scale="Reds", range_color=[0, max_val], map_style="white-bg",
                             zoom=9.2, center={"lat": 17.58, "lon": 120.80}, opacity=0.7, hover_name='Muncity',
                             hover_data={'Muncity': False, 'Total Cases': ':,'}
                         )
                         fig_map.add_trace(go.Scattermap(
-                            lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color='black'), hoverinfo='skip', showlegend=False
+                            lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=9, color='black'), hoverinfo='skip', showlegend=False
                         ))
-                        fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, coloraxis_colorbar=dict(title="Cases"), height=600)
-                        st.plotly_chart(fig_map, use_container_width=True)
+                        fig_map.update_layout(
+                            dragmode=False,
+                            margin={"r":0,"t":0,"l":0,"b":0}, 
+                            coloraxis_colorbar=dict(title="Cases"), 
+                            height=600,
+                            map=dict(layers=[dict(sourcetype="raster", source=["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"])])
+                        )
+                        st.plotly_chart(
+                            fig_map, 
+                            use_container_width=True,
+                            key="dengue_muni_map",
+                            config={
+                                'scrollZoom': False, 
+                                'displayModeBar': True, 
+                                'toImageButtonOptions': {'format': 'png', 'filename': 'Dengue_Map_Abra', 'scale': 2}
+                            }
+                        )
                     except Exception as e:
                         st.error(f"Plotly encountered an internal error rendering the Municipality map: {e}")
                 else:
@@ -1400,17 +1442,34 @@ def render_tb():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
+                        max_val = max(1, int(map_data["Total Cases"].max()))
+                        
                         fig_map = px.choropleth_map(
                             map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
-                            color='Total Cases', color_continuous_scale="Blues", map_style="white-bg",
+                            color='Total Cases', color_continuous_scale="Blues", range_color=[0, max_val], map_style="white-bg",
                             zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.7, hover_name='Barangay_Display',
                             hover_data={'Join_Key': False, 'Total Cases': ':,', 'Barangay_Display': False}
                         )
                         fig_map.add_trace(go.Scattermap(
-                            lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color='black'), hoverinfo='skip', showlegend=False
+                            lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=9, color='black'), hoverinfo='skip', showlegend=False
                         ))
-                        fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, coloraxis_colorbar=dict(title="Cases"), height=600)
-                        st.plotly_chart(fig_map, use_container_width=True)
+                        fig_map.update_layout(
+                            dragmode=False,
+                            margin={"r":0,"t":0,"l":0,"b":0}, 
+                            coloraxis_colorbar=dict(title="Cases"), 
+                            height=600,
+                            map=dict(layers=[dict(sourcetype="raster", source=["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"])])
+                        )
+                        st.plotly_chart(
+                            fig_map, 
+                            use_container_width=True,
+                            key="tb_brgy_map",
+                            config={
+                                'scrollZoom': False, 
+                                'displayModeBar': True, 
+                                'toImageButtonOptions': {'format': 'png', 'filename': f'TB_Map_{muncity_input}', 'scale': 2}
+                            }
+                        )
                     except Exception as e:
                         st.error(f"Plotly error rendering Barangay map: {e}")
                 else: st.warning("No geographic mapping data available for the selected filters.")
@@ -1432,22 +1491,47 @@ def render_tb():
                     cases = match['Total Cases'].values[0] if not match.empty else 0
                     lon, lat = get_polygon_centroid(feat['geometry'])
                     if lon is not None and lat is not None:
+                        # --- NUDGE ALGORITHM FOR ABRA ---
+                        if "MANABO" in std_name.upper(): lat -= 0.015
+                        elif "SALLAPADAN" in std_name.upper(): lat += 0.015
+                        elif "BANGUED" in std_name.upper(): lon -= 0.02
+                        elif "PEÑARRUBIA" in std_name.upper(): lon += 0.02
+                        elif "LANGIDEN" in std_name.upper(): lon -= 0.015
+                        elif "PIDIGAN" in std_name.upper(): lon -= 0.015
+                        
                         lons.append(float(lon)); lats.append(float(lat))
                         texts.append(f"{std_name.title()}<br>{int(cases)}")
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
+                        max_val = max(1, int(map_data["Total Cases"].max()))
+                        
                         fig_map = px.choropleth_map(
                             map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
-                            color='Total Cases', color_continuous_scale="Blues", map_style="white-bg",
+                            color='Total Cases', color_continuous_scale="Blues", range_color=[0, max_val], map_style="white-bg",
                             zoom=9.2, center={"lat": 17.58, "lon": 120.80}, opacity=0.7, hover_name='Muncity',
                             hover_data={'Muncity': False, 'Total Cases': ':,'}
                         )
                         fig_map.add_trace(go.Scattermap(
-                            lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color='black'), hoverinfo='skip', showlegend=False
+                            lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=9, color='black'), hoverinfo='skip', showlegend=False
                         ))
-                        fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, coloraxis_colorbar=dict(title="Cases"), height=600)
-                        st.plotly_chart(fig_map, use_container_width=True)
+                        fig_map.update_layout(
+                            dragmode=False,
+                            margin={"r":0,"t":0,"l":0,"b":0}, 
+                            coloraxis_colorbar=dict(title="Cases"), 
+                            height=600,
+                            map=dict(layers=[dict(sourcetype="raster", source=["https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"])])
+                        )
+                        st.plotly_chart(
+                            fig_map, 
+                            use_container_width=True,
+                            key="tb_muni_map",
+                            config={
+                                'scrollZoom': False, 
+                                'displayModeBar': True, 
+                                'toImageButtonOptions': {'format': 'png', 'filename': 'TB_Map_Abra', 'scale': 2}
+                            }
+                        )
                     except Exception as e:
                         st.error(f"Plotly error rendering Municipality map: {e}")
                 else: st.warning("No geographic mapping data available for the selected filters.")
