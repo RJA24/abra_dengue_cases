@@ -334,8 +334,8 @@ def apply_label_nudges(muni_name, lat, lon):
     elif "BOLINEY" in name:
         pass
     elif "BUCAY" in name:
-        lat += 0.015
-        lon += 0.015
+        lat -= 0.03
+        lon -= 0.015
     elif "BUCLOC" in name:
         pass
     elif "DAGUIOMAN" in name:
