@@ -1102,7 +1102,7 @@ def render_dengue():
                                     'filename': 'Abra_Choropleth_Map',
                                     'height': 1080,
                                     'width': 1920,
-                                    'scale': 2 # This doubles the resolution and separates the collision boxes!
+                                    'scale': 3
                                 }
                             }
                         )
