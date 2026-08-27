@@ -1460,28 +1460,59 @@ def render_tb():
                     max_cases = int(map_data["Total Cases"].max())
                     safe_max = max(1, max_cases)
                     try:
-                        fig_map = go.Figure(go.Choroplethmap(
-                            geojson=brgy_geojson, 
-                            locations=map_data['Join_Key'], 
-                            featureidkey='properties.Standard_Name', 
-                            z=map_data['Total Cases'], 
-                            text=map_data['Barangay_Display'],
-                            hovertemplate="<b>%{text}</b><br>Total Cases: %{z}<extra></extra>",
-                            colorscale="Blues",
-                            zmin=0, 
-                            zmax=safe_max,
-                            marker={"opacity": 1.0, "line": {"width": 0.5, "color": "gray"}}
-                        ))
-                        fig_map.update_layout(
-                            map_style=style_map[map_style_choice],
-                            map_zoom=11.5,
-                            map_center={"lat": cam_lat, "lon": cam_lon},
-                            margin={"r":0,"t":20,"l":0,"b":0}, height=850
-                        )
-                        if map_style_choice == "Satellite": fig_map.update_layout(map_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
-                        fig_map.add_trace(go.Scattermap(lon=lons, lat=lats, mode='markers+text', text=texts, textposition='middle center',textfont=dict(size=12, color=label_color), marker=dict(allowoverlap=True, size=0, opacity=0), hoverinfo='skip', showlegend=False))
-                        st.plotly_chart(fig_map, use_container_width=True, config={'scrollZoom': False})
-                    except Exception as e: st.error(f"Plotly encountered an error rendering the map: {e}")
+                        # 1. Map Theme Router
+                        if map_style_choice == "Dark":
+                            tiles = "CartoDB dark_matter"
+                            attr = "CartoDB"
+                            text_col, outline_col = "white", "black"
+                        elif map_style_choice == "Satellite":
+                            tiles = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                            attr = "Esri"
+                            text_col, outline_col = "white", "black"
+                        else:
+                            tiles = "CartoDB positron"
+                            attr = "CartoDB"
+                            text_col, outline_col = "black", "white"
+                            
+                        # 2. Initialize the Canvas
+                        m = folium.Map(location=[17.58, 120.83], zoom_start=9.2, tiles=tiles, attr=attr)
+                        
+                        # 3. Draw the Choropleth Polygons
+                        folium.Choropleth(
+                            geo_data=abra_geojson,
+                            name="choropleth",
+                            data=map_data,
+                            columns=["Muncity", "Total Cases"],
+                            key_on="feature.properties.Standard_Name",
+                            fill_color="Blues",
+                            fill_opacity=0.85,
+                            line_opacity=0.8,
+                            line_color="gray",
+                            legend_name="Total TB Cases"
+                        ).add_to(m)
+                        
+                        # 4. INJECT HTML LABELS (Forces 100% Visibility)
+                        for i in range(len(lons)):
+                            html_label = f'''
+                                <div style="font-size: 11pt; font-family: Arial Black; color: {text_col}; text-align: center; 
+                                text-shadow: -1.5px -1.5px 0 {outline_col}, 1.5px -1.5px 0 {outline_col}, -1.5px 1.5px 0 {outline_col}, 1.5px 1.5px 0 {outline_col};">
+                                    {texts[i]}
+                                </div>
+                            '''
+                            folium.map.Marker(
+                                [lats[i], lons[i]],
+                                icon=DivIcon(
+                                    icon_size=(150, 36),
+                                    icon_anchor=(75, 18),
+                                    html=html_label
+                                )
+                            ).add_to(m)
+                            
+                        # 5. Render to Streamlit
+                        st_folium(m, use_container_width=True, height=850, returned_objects=[])
+                        
+                    except Exception as e:
+                        st.error(f"Folium encountered an error rendering the map: {e}")
                 else: st.warning("No geographic mapping data available for the selected filters.")
             else: st.error(err if err else "Barangay column (Brgy) missing in data.")
                 
