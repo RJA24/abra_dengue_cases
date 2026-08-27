@@ -1088,31 +1088,34 @@ def render_dengue():
                         
                         fig_map.update_layout(
                             map_style=style_map[map_style_choice],
-                            map_zoom=9.5, # Adjust zoom slightly for portrait
-                            map_center={"lat": cam_lat, "lon": cam_lon},
+                            map_zoom=9.5,
+                            map_center={"lat": 17.58, "lon": 120.83}, # Fixed Abra coordinates
                             margin={"r":0,"t":20,"l":0,"b":0}, 
-                            width=600,    # 3x5 Portrait Width
-                            height=1000   # 3x5 Portrait Height
+                            width=600,  # 3x5 Portrait dimension
+                            height=1000 # 3x5 Portrait dimension
                         )
                         
                         if map_style_choice == "Satellite":
                             fig_map.update_layout(map_layers=[{"below": 'traces', "sourcetype": "raster", "sourceattribution": "Esri", "source": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}])
 
                         fig_map.add_trace(go.Scattermap(lon=lons, lat=lats, mode='markers+text', text=texts, textposition='middle center',textfont=dict(size=12, color=label_color), marker=dict(allowoverlap=True, size=0, opacity=0), hoverinfo='skip', showlegend=False))
-                        st.plotly_chart(
-                            fig_map, 
-                            use_container_width=True, 
-                            config={
-                                'scrollZoom': False,
-                                'toImageButtonOptions': {
-                                    'format': 'png', 
-                                    'filename': 'Abra_Choropleth_Map',
-                                    'height': 1080,
-                                    'width': 1920,
-                                    'scale': 3
+                        
+                        col_space1, col_map, col_space2 = st.columns([1, 2, 1])
+                        with col_map:
+                            st.plotly_chart(
+                                fig_map, 
+                                use_container_width=False, 
+                                config={
+                                    'scrollZoom': False,
+                                    'toImageButtonOptions': {
+                                        'format': 'png', 
+                                        'filename': 'Abra_Choropleth_Map',
+                                        'height': 1000,
+                                        'width': 600,
+                                        'scale': 3
+                                    }
                                 }
-                            }
-                        )
+                            )
                     except Exception as e:
                         st.error(f"Plotly encountered an internal error rendering the Municipality map: {e}")
                 else:
