@@ -1006,13 +1006,13 @@ def render_dengue():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
-                        fig_map = px.choropleth_mapbox(
+                        fig_map = px.choropleth_map(
                             map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
-                            color='Total Cases', color_continuous_scale="Reds", mapbox_style="carto-positron",
+                            color='Total Cases', color_continuous_scale="Reds", map_style="carto-positron",
                             zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.7, hover_name='Barangay_Display',
                             hover_data={'Join_Key': False, 'Total Cases': ':,', 'Barangay_Display': False}
                         )
-                        fig_map.add_trace(go.Scattermapbox(
+                        fig_map.add_trace(go.Scattermap(
                             lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color='black'), hoverinfo='skip', showlegend=False
                         ))
                         fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, coloraxis_colorbar=dict(title="Cases"), height=600)
@@ -1044,13 +1044,13 @@ def render_dengue():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
-                        fig_map = px.choropleth_mapbox(
+                        fig_map = px.choropleth_map(
                             map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
-                            color='Total Cases', color_continuous_scale="Reds", mapbox_style="carto-positron",
+                            color='Total Cases', color_continuous_scale="Reds", map_style="carto-positron",
                             zoom=9.2, center={"lat": 17.58, "lon": 120.80}, opacity=0.7, hover_name='Muncity',
                             hover_data={'Muncity': False, 'Total Cases': ':,'}
                         )
-                        fig_map.add_trace(go.Scattermapbox(
+                        fig_map.add_trace(go.Scattermap(
                             lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color='black'), hoverinfo='skip', showlegend=False
                         ))
                         fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, coloraxis_colorbar=dict(title="Cases"), height=600)
@@ -1400,13 +1400,13 @@ def render_tb():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
-                        fig_map = px.choropleth_mapbox(
+                        fig_map = px.choropleth_map(
                             map_data, geojson=brgy_geojson, locations='Join_Key', featureidkey='properties.Standard_Name', 
-                            color='Total Cases', color_continuous_scale="Blues", mapbox_style="carto-positron",
+                            color='Total Cases', color_continuous_scale="Blues", map_style="carto-positron",
                             zoom=11.5, center={"lat": cam_lat, "lon": cam_lon}, opacity=0.7, hover_name='Barangay_Display',
                             hover_data={'Join_Key': False, 'Total Cases': ':,', 'Barangay_Display': False}
                         )
-                        fig_map.add_trace(go.Scattermapbox(
+                        fig_map.add_trace(go.Scattermap(
                             lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color='black'), hoverinfo='skip', showlegend=False
                         ))
                         fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, coloraxis_colorbar=dict(title="Cases"), height=600)
@@ -1437,13 +1437,13 @@ def render_tb():
                 
                 if not map_data.empty and "Total Cases" in map_data.columns:
                     try:
-                        fig_map = px.choropleth_mapbox(
+                        fig_map = px.choropleth_map(
                             map_data, geojson=abra_geojson, locations='Muncity', featureidkey='properties.Standard_Name', 
-                            color='Total Cases', color_continuous_scale="Blues", mapbox_style="carto-positron",
+                            color='Total Cases', color_continuous_scale="Blues", map_style="carto-positron",
                             zoom=9.2, center={"lat": 17.58, "lon": 120.80}, opacity=0.7, hover_name='Muncity',
                             hover_data={'Muncity': False, 'Total Cases': ':,'}
                         )
-                        fig_map.add_trace(go.Scattermapbox(
+                        fig_map.add_trace(go.Scattermap(
                             lon=lons, lat=lats, mode='text', text=texts, textfont=dict(size=12, color='black'), hoverinfo='skip', showlegend=False
                         ))
                         fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, coloraxis_colorbar=dict(title="Cases"), height=600)
