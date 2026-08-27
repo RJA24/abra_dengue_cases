@@ -1092,7 +1092,7 @@ def render_dengue():
                             map_center={"lat": 17.58, "lon": 120.83}, # Fixed Abra coordinates
                             margin={"r":0,"t":20,"l":0,"b":0}, 
                             width=600,  # 3x5 Portrait dimension
-                            height=1000 # 3x5 Portrait dimension
+                            height=700 # 3x5 Portrait dimension
                         )
                         
                         if map_style_choice == "Satellite":
@@ -1110,7 +1110,7 @@ def render_dengue():
                                     'toImageButtonOptions': {
                                         'format': 'png', 
                                         'filename': 'Abra_Choropleth_Map',
-                                        'height': 1000,
+                                        'height': 700,
                                         'width': 600,
                                         'scale': 3
                                     }
