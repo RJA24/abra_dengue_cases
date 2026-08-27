@@ -1493,20 +1493,27 @@ def render_tb():
                         
                         # 4. INJECT HTML LABELS (Forces 100% Visibility)
                         for i in range(len(lons)):
+                            # Use inline-block so the div tightly hugs the text, preventing invisible overlaps
                             html_label = f'''
-                                <div style="font-size: 11pt; font-family: Arial Black; color: {text_col}; text-align: center; 
-                                text-shadow: -1.5px -1.5px 0 {outline_col}, 1.5px -1.5px 0 {outline_col}, -1.5px 1.5px 0 {outline_col}, 1.5px 1.5px 0 {outline_col};">
+                                <div style="display: inline-block; font-size: 11pt; font-weight: bold; font-family: Arial; color: {text_col}; text-align: center; line-height: 1.1; 
+                                text-shadow: -1.5px -1.5px 0 {outline_col}, 1.5px -1.5px 0 {outline_col}, -1.5px 1.5px 0 {outline_col}, 1.5px 1.5px 0 {outline_col}; white-space: nowrap;">
                                     {texts[i]}
                                 </div>
                             '''
                             folium.map.Marker(
                                 [lats[i], lons[i]],
                                 icon=DivIcon(
-                                    icon_size=(150, 36),
-                                    icon_anchor=(75, 18),
-                                    html=html_label
+                                    # Shrink the physical icon boundary to be incredibly small so they don't block each other
+                                    icon_size=(10, 10), 
+                                    icon_anchor=(0, 0), # Centers the div natively based on text size
+                                    html=html_label,
+                                    # Give it a CSS class to center transform it perfectly over the coordinate
+                                    class_name="custom-div-icon" 
                                 )
                             ).add_to(m)
+                            
+                        # Inject CSS to center the DivIcon exactly over the anchor point
+                        m.get_root().html.add_child(folium.Element("<style>.custom-div-icon { transform: translate(-50%, -50%); }</style>"))
                             
                         # 5. Render to Streamlit without triggering reruns
                         st_folium(m, use_container_width=True, height=850, returned_objects=[])
