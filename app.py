@@ -1394,11 +1394,7 @@ def render_tb():
             total_cases_count = len(df_combined)
             st.metric(label=f"Total Notified Cases ({selected_year})", value=f"{total_cases_count:,}")
             
-            st.info(
-                "📊 **Recommended Chart:** A multi-year Case Notification Rate (CNR) trend line comparing "
-                "provincial notification targets against actual detection rates per 100k population."
-            )
-
+            
         st.markdown("<hr style='margin: 30px 0; border: none; border-bottom: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
 
         # --- ROW 2: Mortality & Treatment Success ---
