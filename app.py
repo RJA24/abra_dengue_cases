@@ -1454,7 +1454,6 @@ def render_tb():
                 
         with col_ts:
             st.markdown("### Treatment Success")
-            st.caption("Based on previous cohort evaluation (2025 / 1-year lag)")
             
             # Fetch 2025 cohort data for treatment success evaluation
             df_2025 = df_all_raw[df_all_raw['Year'] == 2025]
