@@ -1105,7 +1105,7 @@ def render_dengue():
                             config={
                                 'scrollZoom': False, 
                                 'displayModeBar': True, 
-                                'toImageButtonOptions': {'format': 'png', 'filename': f'Dengue_Map_{muncity_input}', 'scale': 2}
+                                'toImageButtonOptions': {'format': 'png', 'filename': f'Dengue_Map_{muncity_input}', 'scale': 4}
                             }
                         )
                     except Exception as e:
@@ -1166,7 +1166,7 @@ def render_dengue():
                             config={
                                 'scrollZoom': False, 
                                 'displayModeBar': True, 
-                                'toImageButtonOptions': {'format': 'png', 'filename': 'Dengue_Map_Abra', 'scale': 2}
+                                'toImageButtonOptions': {'format': 'png', 'filename': 'Dengue_Map_Abra', 'scale': 4}
                             }
                         )
                     except Exception as e:
@@ -1689,7 +1689,7 @@ def render_tb():
                             config={
                                 'scrollZoom': False, 
                                 'displayModeBar': True, 
-                                'toImageButtonOptions': {'format': 'png', 'filename': f'TB_Map_{muncity_input}', 'scale': 2}
+                                'toImageButtonOptions': {'format': 'png', 'filename': f'TB_Map_{muncity_input}', 'scale': 4}
                             }
                         )
                     except Exception as e:
@@ -1750,7 +1750,7 @@ def render_tb():
                             config={
                                 'scrollZoom': False, 
                                 'displayModeBar': True, 
-                                'toImageButtonOptions': {'format': 'png', 'filename': 'TB_Map_Abra', 'scale': 2}
+                                'toImageButtonOptions': {'format': 'png', 'filename': 'TB_Map_Abra', 'scale': 4}
                             }
                         )
                     except Exception as e:
