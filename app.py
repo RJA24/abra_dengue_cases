@@ -1417,18 +1417,35 @@ def render_tb():
         with col_mort:
             st.markdown("### Mortality")
             if not df_combined.empty and "Outcome/Status" in df_combined.columns:
-                # Filter for deaths
+                # Filter strictly for deaths
                 df_died = df_combined[df_combined["Outcome/Status"].str.upper().str.contains("DIED", na=False)]
                 
                 if not df_died.empty:
-                    mort_counts = df_died["Outcome/Status"].value_counts().reset_index()
-                    mort_counts.columns = ["Reason / Status", "Count"]
+                    # Group by the 'Outcome Reason' column instead of the status
+                    if "Outcome Reason" in df_died.columns:
+                        mort_counts = df_died["Outcome Reason"].fillna("Unspecified").value_counts().reset_index()
+                        mort_counts.columns = ["Reason", "Count"]
+                    else:
+                        mort_counts = pd.DataFrame({"Reason": ["Unspecified"], "Count": [len(df_died)]})
+                        
+                    # Calculate total deaths for the center label
+                    total_deaths = mort_counts["Count"].sum()
+                    
                     fig_mort = px.pie(
-                        mort_counts, names="Reason / Status", values="Count", hole=0.5,
+                        mort_counts, names="Reason", values="Count", hole=0.5,
                         title=f"Mortality Breakdown ({selected_year})",
-                        color_discrete_sequence=["#ef4444", "#f97316", "#dc2626"]
+                        color_discrete_sequence=["#ef4444", "#f97316", "#dc2626", "#8b5cf6"]
                     )
-                    fig_mort.update_layout(height=380, margin=dict(t=40, b=10, l=10, r=10))
+                    
+                    # Show raw numbers on slices
+                    fig_mort.update_traces(textinfo='value')
+                    
+                    # Inject large bold total exactly in the center
+                    fig_mort.update_layout(
+                        height=380, 
+                        margin=dict(t=40, b=10, l=10, r=10),
+                        annotations=[dict(text=f"<b>{total_deaths:,}</b>", x=0.5, y=0.5, font=dict(size=36, color="#0f172a"), showarrow=False)]
+                    )
                     st.plotly_chart(fig_mort, use_container_width=True)
                 else:
                     st.success(f"No recorded mortality outcomes for {selected_year}.")
