@@ -1377,12 +1377,25 @@ def render_tb():
             if not df_combined.empty and "Case_Type" in df_combined.columns:
                 case_counts = df_combined["Case_Type"].value_counts().reset_index()
                 case_counts.columns = ["Case Type", "Count"]
+                
+                # Calculate the grand total to place in the center
+                total_cases_donut = case_counts["Count"].sum()
+                
                 fig_total_cases = px.pie(
                     case_counts, names="Case Type", values="Count", hole=0.5,
                     title=f"Total Cases Breakdown ({selected_year})",
                     color_discrete_map={"DSTB": "#3b82f6", "DRTB": "#ef4444", "MN": "#f59e0b"}
                 )
-                fig_total_cases.update_layout(height=380, margin=dict(t=40, b=10, l=10, r=10))
+                
+                # Force the pie slices to show raw numbers instead of percentages
+                fig_total_cases.update_traces(textinfo='value')
+                
+                # Inject the large bold total exactly in the center (x=0.5, y=0.5)
+                fig_total_cases.update_layout(
+                    height=380, 
+                    margin=dict(t=40, b=10, l=10, r=10),
+                    annotations=[dict(text=f"<b>{total_cases_donut:,}</b>", x=0.5, y=0.5, font=dict(size=36, color="#0f172a"), showarrow=False)]
+                )
                 st.plotly_chart(fig_total_cases, use_container_width=True)
             else:
                 st.info(f"No case data available for {selected_year}.")
