@@ -1473,11 +1473,16 @@ def render_tb():
                 )
                 fig_ts.update_traces(textinfo='value')
                 
-                # FIXED: Corrected Plotly annotation syntax
+                # FIXED: Wrapped the percentage in <b> tags and scaled font to 36 to match the others
                 fig_ts.update_layout(
                     height=380, 
                     margin=dict(t=40, b=10, l=10, r=10),
-                    annotations=[dict(text=f"{success_rate:.1f}%<br><span style='font-size:12px'>Success Rate</span>", x=0.5, y=0.5, font=dict(size=20), showarrow=False)]
+                    annotations=[dict(
+                        text=f"<b>{success_rate:.1f}%</b><br><span style='font-size:14px; color:#64748b'>Success Rate</span>", 
+                        x=0.5, y=0.5, 
+                        font=dict(size=36, color="#0f172a"), 
+                        showarrow=False
+                    )]
                 )
                 st.plotly_chart(fig_ts, use_container_width=True)
             else:
