@@ -409,7 +409,7 @@ def get_tb_targets():
     """
     Loads and cleans the 2026 TB targets from the 'Targets' Google Sheet.
     Returns:
-        prov_targets (dict): Provincial totals for population, screened, and tested targets.
+        prov_targets (dict): Provincial totals for population, screened, tested, and notified targets.
         df_muni_targets (pd.DataFrame): Municipality-level target breakdown.
     """
     try:
@@ -425,8 +425,10 @@ def get_tb_targets():
         pop_col = [c for c in df_raw.columns if "POPULATION" in c.upper() and "%" not in c][0]
         screen_col = [c for c in df_raw.columns if "SCREENED" in c.upper()][0]
         test_col = [c for c in df_raw.columns if "TESTED" in c.upper()][0]
+        notified_col = [c for c in df_raw.columns if "NOTIFIED" in c.upper()][0] # <--- Added the new column here
         
-        for col in [pop_col, screen_col, test_col]:
+        # Clean all numeric fields
+        for col in [pop_col, screen_col, test_col, notified_col]:
             df_raw[col] = pd.to_numeric(
                 df_raw[col].astype(str).str.replace(",", "").str.strip(), 
                 errors="coerce"
@@ -435,24 +437,28 @@ def get_tb_targets():
         df_raw[muni_col] = df_raw[muni_col].astype(str).str.strip().str.upper()
         df_raw[muni_col] = df_raw[muni_col].replace({"PENARRUBIA": "PEÑARRUBIA"})
         
+        # Extract Provincial Total
         df_abra = df_raw[df_raw[muni_col] == "ABRA"]
         if not df_abra.empty:
             prov_targets = {
                 "population": int(df_abra[pop_col].values[0]),
                 "screened_target": int(df_abra[screen_col].values[0]),
-                "tested_target": int(df_abra[test_col].values[0])
+                "tested_target": int(df_abra[test_col].values[0]),
+                "notified_target": int(df_abra[notified_col].values[0]) # <--- Track Provincial Notified Target
             }
         else:
-            prov_targets = {"population": 251555, "screened_target": 28419, "tested_target": 4861}
+            prov_targets = {"population": 251555, "screened_target": 28419, "tested_target": 4861, "notified_target": 1389}
             
+        # Extract Municipal Breakdown
         df_munis = df_raw[~df_raw[muni_col].isin(["ABRA", "NAN", "NONE", ""])].copy()
         
-        df_muni_targets = df_munis.groupby(muni_col)[[pop_col, screen_col, test_col]].sum().reset_index()
+        df_muni_targets = df_munis.groupby(muni_col)[[pop_col, screen_col, test_col, notified_col]].sum().reset_index()
         df_muni_targets.rename(columns={
             muni_col: "Muncity",
             pop_col: "Target_Population",
             screen_col: "Target_Screened",
-            test_col: "Target_Tested"
+            test_col: "Target_Tested",
+            notified_col: "Target_Notified" # <--- Map to dataframe
         }, inplace=True)
         
         return prov_targets, df_muni_targets
@@ -1432,15 +1438,18 @@ def render_tb():
         if muncity_input == "All Municipalities":
             active_population = prov_targets.get("population", 251555)
             active_screened_target = prov_targets.get("screened_target", 28419)
+            active_notified_target = prov_targets.get("notified_target", 1389)
             target_scope_label = "Abra Province"
         else:
             muni_target_row = df_muni_targets[df_muni_targets["Muncity"] == muncity_input.upper()]
             if not muni_target_row.empty:
                 active_population = int(muni_target_row["Target_Population"].values[0])
                 active_screened_target = int(muni_target_row["Target_Screened"].values[0])
+                active_notified_target = int(muni_target_row["Target_Notified"].values[0])
             else:
                 active_population = 0
                 active_screened_target = 0
+                active_notified_target = 0
             target_scope_label = muncity_input.title()
 
         total_notified_cases = len(df_combined)
@@ -1481,14 +1490,12 @@ def render_tb():
             
             cnr_val = (total_notified_cases / active_population * 100000) if active_population > 0 else 0
             
-            # KPI Cards for CNR
             c_cnr1, c_cnr2 = st.columns(2)
             with c_cnr1:
                 st.metric("Total Notified Cases", f"{total_notified_cases:,}")
             with c_cnr2:
                 st.metric("CNR (per 100k Pop)", f"{cnr_val:.1f}", f"Pop: {active_population:,}", delta_color="off")
                 
-            # CNR comparison chart across municipalities
             if muncity_input == "All Municipalities" and not df_muni_targets.empty and "Muncity" in df_combined.columns:
                 df_cases_muni = df_combined.groupby("Muncity").size().reset_index(name="Notified_Cases")
                 df_cases_muni["Muncity"] = df_cases_muni["Muncity"].str.upper()
@@ -1501,7 +1508,7 @@ def render_tb():
                 
                 fig_cnr = px.bar(
                     df_cnr_muni, x="CNR", y="Muncity", orientation="h", text_auto=".1f",
-                    title="Case Notification Rate per 100k Population by Municipality",
+                    title="Case Notification Rate per 100k Pop by Municipality",
                     color_discrete_sequence=["#3b82f6"]
                 )
                 fig_cnr.update_layout(height=300, margin=dict(t=40, b=10, l=10, r=10), xaxis_title="CNR per 100k", yaxis_title="")
@@ -1582,11 +1589,11 @@ def render_tb():
 
         st.markdown("<hr style='margin: 30px 0; border: none; border-bottom: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
 
-        # --- ROW 3: Case Detection Rate (Option B: Screened Target) ---
+        # --- ROW 3: Case Detection Rate ---
         st.markdown("### Case Detection Rate (CDR)")
-        st.caption(f"Calculated as Total Notified Cases against the 2026 Screened Target ({target_scope_label})")
+        st.caption(f"Calculated as Total Notified Cases against the 2026 Notified TB Cases Target ({target_scope_label})")
         
-        cdr_pct = (total_notified_cases / active_screened_target * 100) if active_screened_target > 0 else 0
+        cdr_pct = (total_notified_cases / active_notified_target * 100) if active_notified_target > 0 else 0
         
         c_cdr_gauge, c_cdr_bar = st.columns([1, 2], gap="large")
         
@@ -1595,25 +1602,26 @@ def render_tb():
                 mode="gauge+number",
                 value=cdr_pct,
                 number={'suffix': "%", 'valueformat': ".1f", 'font': {'size': 38, 'color': '#0f172a'}},
-                title={'text': "<b>Accomplishment vs Screened Target</b>", 'font': {'size': 16}},
+                title={'text': "<b>Accomplishment vs Notified Target</b>", 'font': {'size': 16}},
                 gauge={
                     'axis': {'range': [0, max(100, int(cdr_pct) + 10)]},
-                    'bar': {'color': "#2563eb"},
+                    'bar': {'color': "#10b981"},
                     'bgcolor': "#f1f5f9",
                     'threshold': {'line': {'color': "#16a34a", 'width': 4}, 'thickness': 0.8, 'value': 100}
                 }
             ))
             fig_cdr_gauge.update_layout(height=320, margin=dict(t=50, b=10, l=20, r=20))
             st.plotly_chart(fig_cdr_gauge, use_container_width=True)
-            st.metric("Total Cases / Screened Target", f"{total_notified_cases:,} / {active_screened_target:,}")
+            st.metric("Total Cases / Notified Target", f"{total_notified_cases:,} / {active_notified_target:,}")
 
         with c_cdr_bar:
             if muncity_input == "All Municipalities" and not df_muni_targets.empty and "Muncity" in df_combined.columns:
                 df_cases_muni = df_combined.groupby("Muncity").size().reset_index(name="Notified_Cases")
                 df_cases_muni["Muncity"] = df_cases_muni["Muncity"].str.upper()
                 df_cdr_muni = pd.merge(df_muni_targets, df_cases_muni, on="Muncity", how="left").fillna(0)
+                
                 df_cdr_muni["CDR %"] = df_cdr_muni.apply(
-                    lambda r: (r["Notified_Cases"] / r["Target_Screened"] * 100) if r["Target_Screened"] > 0 else 0, 
+                    lambda r: (r["Notified_Cases"] / r["Target_Notified"] * 100) if r["Target_Notified"] > 0 else 0, 
                     axis=1
                 )
                 df_cdr_muni = df_cdr_muni.sort_values("CDR %", ascending=True)
@@ -1632,7 +1640,7 @@ def render_tb():
                 )
                 st.plotly_chart(fig_cdr_bar, use_container_width=True)
             else:
-                st.info(f"Target breakdown for {target_scope_label}: {total_notified_cases:,} cases detected out of {active_screened_target:,} screened target.")
+                st.info(f"Target breakdown for {target_scope_label}: {total_notified_cases:,} cases detected out of {active_notified_target:,} target.")
 
     with tab3:
         st.subheader(f"Demographic Distribution ({selected_year})")
