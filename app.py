@@ -414,7 +414,7 @@ def get_tb_targets():
     """
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
-        df_raw = conn.read(spreadsheet=sheet_url, worksheet="Targets", skiprows=0)
+        df_raw = conn.read(spreadsheet=SHEET_URL, worksheet="Targets", skiprows=0)
         
         if df_raw.empty:
             return {}, pd.DataFrame()
