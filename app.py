@@ -213,6 +213,7 @@ def update_credentials(old_username, new_username, new_password):
     
     save_users_df(df)
     return True
+    
 
 # ==========================================
 # SESSION STATE INITIALIZATION
@@ -402,6 +403,62 @@ def load_data():
     if 'DOnset' in df.columns: df['DOnset'] = pd.to_datetime(df['DOnset'], errors='coerce')
     if 'Muncity' in df.columns: df['Muncity'] = df['Muncity'].apply(clean_muni_name)
     return df
+
+@st.cache_data(ttl="1h")
+def get_tb_targets():
+    """
+    Loads and cleans the 2026 TB targets from the 'Targets' Google Sheet.
+    Returns:
+        prov_targets (dict): Provincial totals for population, screened, and tested targets.
+        df_muni_targets (pd.DataFrame): Municipality-level target breakdown.
+    """
+    try:
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        df_raw = conn.read(spreadsheet=sheet_url, worksheet="Targets", skiprows=0)
+        
+        if df_raw.empty:
+            return {}, pd.DataFrame()
+            
+        df_raw.columns = [str(c).strip() for c in df_raw.columns]
+        
+        muni_col = "Municipality"
+        pop_col = [c for c in df_raw.columns if "POPULATION" in c.upper() and "%" not in c][0]
+        screen_col = [c for c in df_raw.columns if "SCREENED" in c.upper()][0]
+        test_col = [c for c in df_raw.columns if "TESTED" in c.upper()][0]
+        
+        for col in [pop_col, screen_col, test_col]:
+            df_raw[col] = pd.to_numeric(
+                df_raw[col].astype(str).str.replace(",", "").str.strip(), 
+                errors="coerce"
+            ).fillna(0)
+            
+        df_raw[muni_col] = df_raw[muni_col].astype(str).str.strip().str.upper()
+        df_raw[muni_col] = df_raw[muni_col].replace({"PENARRUBIA": "PEÑARRUBIA"})
+        
+        df_abra = df_raw[df_raw[muni_col] == "ABRA"]
+        if not df_abra.empty:
+            prov_targets = {
+                "population": int(df_abra[pop_col].values[0]),
+                "screened_target": int(df_abra[screen_col].values[0]),
+                "tested_target": int(df_abra[test_col].values[0])
+            }
+        else:
+            prov_targets = {"population": 251555, "screened_target": 28419, "tested_target": 4861}
+            
+        df_munis = df_raw[~df_raw[muni_col].isin(["ABRA", "NAN", "NONE", ""])].copy()
+        
+        df_muni_targets = df_munis.groupby(muni_col)[[pop_col, screen_col, test_col]].sum().reset_index()
+        df_muni_targets.rename(columns={
+            muni_col: "Muncity",
+            pop_col: "Target_Population",
+            screen_col: "Target_Screened",
+            test_col: "Target_Tested"
+        }, inplace=True)
+        
+        return prov_targets, df_muni_targets
+    except Exception as e:
+        st.error(f"Error loading TB Targets sheet: {e}")
+        return {}, pd.DataFrame()
 
 @st.cache_data(ttl=600)
 def load_tb_data(sheet_name):
@@ -1366,8 +1423,27 @@ def render_tb():
 
     with tab2:
         st.subheader(f"Program Performance Overview ({selected_year})")
-        st.caption("This Tab is Under Construction. Charts and metrics will be added in future updates.")
         st.markdown("---")
+        
+        # Load targets from Google Sheets
+        prov_targets, df_muni_targets = get_tb_targets()
+        
+        # Determine baseline targets based on municipality filter
+        if muncity_input == "All Municipalities":
+            active_population = prov_targets.get("population", 251555)
+            active_screened_target = prov_targets.get("screened_target", 28419)
+            target_scope_label = "Abra Province"
+        else:
+            muni_target_row = df_muni_targets[df_muni_targets["Muncity"] == muncity_input.upper()]
+            if not muni_target_row.empty:
+                active_population = int(muni_target_row["Target_Population"].values[0])
+                active_screened_target = int(muni_target_row["Target_Screened"].values[0])
+            else:
+                active_population = 0
+                active_screened_target = 0
+            target_scope_label = muncity_input.title()
+
+        total_notified_cases = len(df_combined)
         
         # --- ROW 1: Total Cases & Case Notification Rate ---
         col_tc, col_cnr = st.columns(2, gap="large")
@@ -1377,8 +1453,6 @@ def render_tb():
             if not df_combined.empty and "Case_Type" in df_combined.columns:
                 case_counts = df_combined["Case_Type"].value_counts().reset_index()
                 case_counts.columns = ["Case Type", "Count"]
-                
-                # Calculate the grand total to place in the center
                 total_cases_donut = case_counts["Count"].sum()
                 
                 fig_total_cases = px.pie(
@@ -1386,29 +1460,53 @@ def render_tb():
                     title=f"Total Cases Breakdown ({selected_year})",
                     color_discrete_map={"DSTB": "#3b82f6", "DRTB": "#ef4444", "MN": "#f59e0b"}
                 )
-                
-                # Force the pie slices to show raw numbers instead of percentages
                 fig_total_cases.update_traces(textinfo='value')
-                
-                # Inject the large bold total exactly in the center (x=0.5, y=0.5)
                 fig_total_cases.update_layout(
                     height=380, 
                     margin=dict(t=40, b=10, l=10, r=10),
-                    annotations=[dict(text=f"<b>{total_cases_donut:,}</b>", x=0.5, y=0.5, font=dict(size=36, color="#0f172a"), showarrow=False)]
+                    annotations=[dict(
+                        text=f"<b>{total_cases_donut:,}</b>", 
+                        x=0.5, y=0.5, 
+                        font=dict(size=36, color="#0f172a"), 
+                        showarrow=False
+                    )]
                 )
                 st.plotly_chart(fig_total_cases, use_container_width=True)
             else:
                 st.info(f"No case data available for {selected_year}.")
                 
         with col_cnr:
-            st.markdown("### Case Notification Rate")
-            st.caption("Measures the total number of new and relapse TB cases detected per 100,051 population.")
+            st.markdown("### Case Notification Rate (CNR)")
+            st.caption(f"Measures notified TB cases per 100,000 population ({target_scope_label})")
             
-            # Metric Card Placeholder / Calculation UI
-            total_cases_count = len(df_combined)
-            st.metric(label=f"Total Notified Cases ({selected_year})", value=f"{total_cases_count:,}")
+            cnr_val = (total_notified_cases / active_population * 100000) if active_population > 0 else 0
             
-            
+            # KPI Cards for CNR
+            c_cnr1, c_cnr2 = st.columns(2)
+            with c_cnr1:
+                st.metric("Total Notified Cases", f"{total_notified_cases:,}")
+            with c_cnr2:
+                st.metric("CNR (per 100k Pop)", f"{cnr_val:.1f}", f"Pop: {active_population:,}", delta_color="off")
+                
+            # CNR comparison chart across municipalities
+            if muncity_input == "All Municipalities" and not df_muni_targets.empty and "Muncity" in df_combined.columns:
+                df_cases_muni = df_combined.groupby("Muncity").size().reset_index(name="Notified_Cases")
+                df_cases_muni["Muncity"] = df_cases_muni["Muncity"].str.upper()
+                df_cnr_muni = pd.merge(df_muni_targets, df_cases_muni, on="Muncity", how="left").fillna(0)
+                df_cnr_muni["CNR"] = df_cnr_muni.apply(
+                    lambda r: (r["Notified_Cases"] / r["Target_Population"] * 100000) if r["Target_Population"] > 0 else 0, 
+                    axis=1
+                )
+                df_cnr_muni = df_cnr_muni.sort_values("CNR", ascending=True)
+                
+                fig_cnr = px.bar(
+                    df_cnr_muni, x="CNR", y="Muncity", orientation="h", text_auto=".1f",
+                    title="Case Notification Rate per 100k Population by Municipality",
+                    color_discrete_sequence=["#3b82f6"]
+                )
+                fig_cnr.update_layout(height=300, margin=dict(t=40, b=10, l=10, r=10), xaxis_title="CNR per 100k", yaxis_title="")
+                st.plotly_chart(fig_cnr, use_container_width=True)
+
         st.markdown("<hr style='margin: 30px 0; border: none; border-bottom: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
 
         # --- ROW 2: Mortality & Treatment Success ---
@@ -1417,18 +1515,15 @@ def render_tb():
         with col_mort:
             st.markdown("### Mortality")
             if not df_combined.empty and "Outcome/Status" in df_combined.columns:
-                # Filter strictly for deaths
                 df_died = df_combined[df_combined["Outcome/Status"].str.upper().str.contains("DIED", na=False)]
                 
                 if not df_died.empty:
-                    # Group by the 'Outcome Reason' column instead of the status
                     if "Outcome Reason" in df_died.columns:
                         mort_counts = df_died["Outcome Reason"].fillna("Unspecified").value_counts().reset_index()
                         mort_counts.columns = ["Reason", "Count"]
                     else:
                         mort_counts = pd.DataFrame({"Reason": ["Unspecified"], "Count": [len(df_died)]})
                         
-                    # Calculate total deaths for the center label
                     total_deaths = mort_counts["Count"].sum()
                     
                     fig_mort = px.pie(
@@ -1436,15 +1531,16 @@ def render_tb():
                         title=f"Mortality Breakdown ({selected_year})",
                         color_discrete_sequence=["#ef4444", "#f97316", "#dc2626", "#8b5cf6"]
                     )
-                    
-                    # Show raw numbers on slices
                     fig_mort.update_traces(textinfo='value')
-                    
-                    # Inject large bold total exactly in the center
                     fig_mort.update_layout(
                         height=380, 
                         margin=dict(t=40, b=10, l=10, r=10),
-                        annotations=[dict(text=f"<b>{total_deaths:,}</b>", x=0.5, y=0.5, font=dict(size=36, color="#0f172a"), showarrow=False)]
+                        annotations=[dict(
+                            text=f"<b>{total_deaths:,}</b>", 
+                            x=0.5, y=0.5, 
+                            font=dict(size=36, color="#0f172a"), 
+                            showarrow=False
+                        )]
                     )
                     st.plotly_chart(fig_mort, use_container_width=True)
                 else:
@@ -1454,14 +1550,13 @@ def render_tb():
                 
         with col_ts:
             st.markdown("### Treatment Success")
+            st.caption("Based on previous cohort evaluation (2025 / 1-year lag)")
             
-            # Fetch 2025 cohort data for treatment success evaluation
             df_2025 = df_all_raw[df_all_raw['Year'] == 2025]
             if not df_2025.empty and "Outcome/Status" in df_2025.columns:
                 outcomes = df_2025["Outcome/Status"].fillna("Unknown").value_counts().reset_index()
                 outcomes.columns = ["Outcome", "Count"]
                 
-                # Calculate Success Rate percentage
                 success_outcomes = df_2025[df_2025["Outcome/Status"].str.upper().isin(["CURED", "TREATMENT COMPLETED"])]
                 success_rate = (len(success_outcomes) / len(df_2025) * 100) if len(df_2025) > 0 else 0
                 
@@ -1471,8 +1566,6 @@ def render_tb():
                     color_discrete_sequence=["#facc15", "#3b82f6", "#ec4899", "#10b981", "#64748b"]
                 )
                 fig_ts.update_traces(textinfo='value')
-                
-                # FIXED: Wrapped the percentage in <b> tags and scaled font to 36 to match the others
                 fig_ts.update_layout(
                     height=380, 
                     margin=dict(t=40, b=10, l=10, r=10),
@@ -1489,20 +1582,57 @@ def render_tb():
 
         st.markdown("<hr style='margin: 30px 0; border: none; border-bottom: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
 
-        # --- ROW 3: Case Detection Rate ---
-        st.markdown("### Case Detection Rate")
-        c_cdr_info, c_cdr_action = st.columns([2, 1])
-        with c_cdr_info:
-            st.markdown(
-                """
-                **Formula:**  
-                $$\\text{Case Detection Rate (CDR)} = \\frac{\\text{Total Notified Cases}}{\\text{2026 Provincial Target}} \\times 100$$
+        # --- ROW 3: Case Detection Rate (Option B: Screened Target) ---
+        st.markdown("### Case Detection Rate (CDR)")
+        st.caption(f"Calculated as Total Notified Cases against the 2026 Screened Target ({target_scope_label})")
+        
+        cdr_pct = (total_notified_cases / active_screened_target * 100) if active_screened_target > 0 else 0
+        
+        c_cdr_gauge, c_cdr_bar = st.columns([1, 2], gap="large")
+        
+        with c_cdr_gauge:
+            fig_cdr_gauge = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=cdr_pct,
+                number={'suffix': "%", 'valueformat': ".1f", 'font': {'size': 38, 'color': '#0f172a'}},
+                title={'text': "<b>Accomplishment vs Screened Target</b>", 'font': {'size': 16}},
+                gauge={
+                    'axis': {'range': [0, max(100, int(cdr_pct) + 10)]},
+                    'bar': {'color': "#2563eb"},
+                    'bgcolor': "#f1f5f9",
+                    'threshold': {'line': {'color': "#16a34a", 'width': 4}, 'thickness': 0.8, 'value': 100}
+                }
+            ))
+            fig_cdr_gauge.update_layout(height=320, margin=dict(t=50, b=10, l=20, r=20))
+            st.plotly_chart(fig_cdr_gauge, use_container_width=True)
+            st.metric("Total Cases / Screened Target", f"{total_notified_cases:,} / {active_screened_target:,}")
+
+        with c_cdr_bar:
+            if muncity_input == "All Municipalities" and not df_muni_targets.empty and "Muncity" in df_combined.columns:
+                df_cases_muni = df_combined.groupby("Muncity").size().reset_index(name="Notified_Cases")
+                df_cases_muni["Muncity"] = df_cases_muni["Muncity"].str.upper()
+                df_cdr_muni = pd.merge(df_muni_targets, df_cases_muni, on="Muncity", how="left").fillna(0)
+                df_cdr_muni["CDR %"] = df_cdr_muni.apply(
+                    lambda r: (r["Notified_Cases"] / r["Target_Screened"] * 100) if r["Target_Screened"] > 0 else 0, 
+                    axis=1
+                )
+                df_cdr_muni = df_cdr_muni.sort_values("CDR %", ascending=True)
                 
-                *Note: This metric will automatically compute once the target baseline sheet is connected.*
-                """
-            )
-        with c_cdr_action:
-            st.warning("⚠️ Target sheet pending integration.")
+                fig_cdr_bar = px.bar(
+                    df_cdr_muni, x="CDR %", y="Muncity", orientation="h", text_auto=".1f",
+                    title="Case Detection Rate (%) by Municipality",
+                    color_discrete_sequence=["#10b981"]
+                )
+                fig_cdr_bar.update_traces(textposition="outside", cliponaxis=False)
+                fig_cdr_bar.update_layout(
+                    height=max(400, len(df_cdr_muni) * 22),
+                    margin=dict(t=40, b=10, l=10, r=40),
+                    xaxis_title="Accomplishment (%)",
+                    yaxis_title=""
+                )
+                st.plotly_chart(fig_cdr_bar, use_container_width=True)
+            else:
+                st.info(f"Target breakdown for {target_scope_label}: {total_notified_cases:,} cases detected out of {active_screened_target:,} screened target.")
 
     with tab3:
         st.subheader(f"Demographic Distribution ({selected_year})")
