@@ -1271,7 +1271,13 @@ def render_tb():
         )
 
         if not df_all_raw.empty and "Muncity" in df_all_raw.columns:
-            muni_options = ["All Municipalities"] + sorted(df_all_raw["Muncity"].dropna().unique().tolist())
+            # Grab all unique values
+            raw_munis = df_all_raw["Muncity"].dropna().unique().tolist()
+            
+            # Strictly keep ONLY valid Abra municipalities to remove blanks and outside towns
+            valid_munis = [m for m in raw_munis if str(m).strip().upper() in ALL_ABRA_MUNICIPALITIES]
+            
+            muni_options = ["All Municipalities"] + sorted(valid_munis)
             muncity_input = st.selectbox("Filter Municipality", options=muni_options, index=0)
         else: muncity_input = "All Municipalities"
             
