@@ -170,25 +170,7 @@ If system usage or data volume grows substantially, the architecture could be mi
 
 ## Screenshots
 
-Add selected application screenshots here, for example:
 
-```markdown
-### Surveillance Gateway
-
-![PESU Gateway](docs/images/gateway.png)
-
-### Dengue Surveillance Dashboard
-
-![Dengue Dashboard](docs/images/dengue-dashboard.png)
-
-### Geographic Analysis
-
-![Dengue Map](docs/images/dengue-map.png)
-
-### Data Quality Validation
-
-![Data Quality](docs/images/data-quality.png)
-```
 
 ## Author
 
