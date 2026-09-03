@@ -51,9 +51,6 @@ def render_tb():
     df_combined = df_all_filtered[df_all_filtered['Year'] == selected_year]
     df_prev_year = df_all_filtered[df_all_filtered['Year'] == (selected_year - 1)]
     
-    if "TPT" in case_type_input: df_tpt = get_aux_tb_data('TPT', selected_year)
-    else: df_tpt = pd.DataFrame()
-    
     df_hiv = get_aux_tb_data('HIV', selected_year)
 
     with st.sidebar:
@@ -115,12 +112,11 @@ def render_tb():
     
     st.markdown("<br>", unsafe_allow_html=True)
 
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "Epidemiological Trends", 
         "Program Performance", 
         "Demographics", 
         "Clinical & Outcomes", 
-        "Preventive Treatment (TPT)", 
         "TB-HIV Collaboration", 
         "Choropleth Map", 
         "Raw Line List"
@@ -449,32 +445,11 @@ def render_tb():
             if "Bacteriologic Status" in df_combined.columns:
                 bac_counts = df_combined["Bacteriologic Status"].fillna("Unknown").value_counts().reset_index()
                 bac_counts.columns = ["Bacteriologic Status", "Count"]
-                fig_bar_bac = px.bar(bac_counts, x="Bacteriologic Status", y="Count", text_auto=True, title="Bacteriologic Status")
-                fig_bar_bac.update_traces(marker_color='#10b981')
-                st.plotly_chart(fig_bar_bac, use_container_width=True)
+                # Swapped out the bar chart for a clean donut chart here!
+                fig_pie_bac = px.pie(bac_counts, names="Bacteriologic Status", values="Count", hole=0.45, title="Bacteriologic Status")
+                st.plotly_chart(fig_pie_bac, use_container_width=True)
 
     with tab5:
-        st.subheader(f"Preventive Treatment (TPT) Analytics ({selected_year})")
-        if not df_tpt.empty:
-            st.metric(f"Total Patients on TPT ({selected_year})", len(df_tpt))
-            c3, c4 = st.columns(2)
-            with c3:
-                if "Indication for TPT" in df_tpt.columns:
-                    ind_counts = df_tpt["Indication for TPT"].fillna("Unknown").value_counts().reset_index()
-                    ind_counts.columns = ["Indication", "Count"]
-                    fig_ind = px.pie(ind_counts, names="Indication", values="Count", hole=0.4, title="Indication for TPT")
-                    st.plotly_chart(fig_ind, use_container_width=True)
-            with c4:
-                if "TPT Regimen" in df_tpt.columns:
-                    reg_tpt_counts = df_tpt["TPT Regimen"].fillna("Unknown").value_counts().reset_index()
-                    reg_tpt_counts.columns = ["Regimen", "Count"]
-                    fig_reg_tpt = px.bar(reg_tpt_counts, x="Regimen", y="Count", text_auto=True, title="TPT Regimen Distribution")
-                    fig_reg_tpt.update_traces(marker_color='#8b5cf6')
-                    st.plotly_chart(fig_reg_tpt, use_container_width=True)
-        else:
-            st.info(f"No TPT data available for {selected_year} or TPT filter is disabled.")
-
-    with tab6:
         st.subheader(f"TB-HIV Collaborative Activities ({selected_year})")
         if not df_hiv.empty:
             num_col = "All Reg Group 15 above TB Cases Tested or with Known HIV Status"
@@ -513,7 +488,7 @@ def render_tb():
                 st.error("HIV Data columns do not match the expected ITIS export format.")
         else: st.info(f"No HIV data available for {selected_year}.")
 
-    with tab7:
+    with tab6:
         if muncity_input != "All Municipalities":
             st.subheader(f"Geographic Heatmap: Barangays in {muncity_input} ({selected_year})")
             brgy_geojson, err = fetch_barangay_geojson(muncity_input)
@@ -634,7 +609,7 @@ def render_tb():
                 else: st.warning("No geographic mapping data available for the selected filters.")
             else: st.error("Could not fetch the Abra geographic boundaries.")
 
-    with tab8:
+    with tab7:
         st.subheader(f"Filtered TB Registry ({selected_year})")
         st.caption("Showing key programmatic columns. Use the Download button in the sidebar for the full dataset.")
         clean_cols = ["TB/TPT Case No.", "Case_Type", "First Name", "Last Name", "Age", "Sex", "Brgy", "Muncity", "Bacteriologic Status", "Outcome/Status", "Date Started Tx"]
