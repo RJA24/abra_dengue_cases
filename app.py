@@ -404,7 +404,10 @@ def render_main_menu():
 
 def main():
     if not st.session_state.logged_in:
-        render_register() if st.session_state.current_page == 'register' else render_login()
+        if st.session_state.current_page == 'register':
+            render_register()
+        else:
+            render_login()
     else:
         profile_img_url = "https://github.com/RJA24/abra_dengue_cases/blob/main/dengue.png?raw=true" if st.session_state.active_program == 'dengue' else "https://github.com/RJA24/abra_sia_2026/blob/main/PHO%20logo.png?raw=true"
 
