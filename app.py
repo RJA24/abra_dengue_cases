@@ -320,10 +320,15 @@ def render_main_menu():
             
             df_tb = get_all_core_tb()
             total_tb_2026 = len(df_tb[df_tb['Year'] == 2026])
-        except Exception:
-            total_dengue, dengue_deaths, total_tb_2026 = 0, 0, 0
             
-        active_users = len(get_users_df()[get_users_df()['status'] == 'approved']) + 1 # +1 for admin
+            # Pull the data ONCE to avoid API rate limits
+            users_df = get_users_df()
+            active_users = len(users_df[users_df['status'] == 'approved']) + 1 
+            
+        except Exception as e:
+            # If Google API throttles us, fail gracefully without crashing
+            print(f"API Dashboard Fetch Error: {e}")
+            total_dengue, dengue_deaths, total_tb_2026, active_users = 0, 0, 0, 1
     
     # --- KPI CARDS ---
     c1, c2, c3, c4 = st.columns(4)
