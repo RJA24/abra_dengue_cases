@@ -5,7 +5,25 @@ from streamlit_gsheets import GSheetsConnection
 from utils.constants import SHEET_URL
 from utils.cleaning import clean_muni_name
 
-@st.cache_data(ttl=600)
+def compress_memory(df):
+    """
+    Advanced Pandas optimization: 
+    Converts low-cardinality text columns to 'category' dtype, significantly reducing RAM usage.
+    """
+    if df.empty:
+        return df
+        
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            num_unique_values = len(df[col].unique())
+            num_total_values = len(df[col])
+            # If less than 50% of the values are unique, it's safer and lighter as a category
+            if num_unique_values / num_total_values < 0.5:
+                df[col] = df[col].astype('category')
+    return df
+
+# Added max_entries=2 to prevent Streamlit from hoarding old cache states in its 1GB RAM limit
+@st.cache_data(ttl=600, max_entries=2)
 def load_data():
     csv_url = f"{SHEET_URL}/export?format=csv&gid=0"
     df = pd.read_csv(csv_url)
@@ -13,9 +31,9 @@ def load_data():
         df['DOnset'] = pd.to_datetime(df['DOnset'], errors='coerce')
     if 'Muncity' in df.columns: 
         df['Muncity'] = df['Muncity'].apply(clean_muni_name)
-    return df
+    return compress_memory(df)
 
-@st.cache_data(ttl="1h")
+@st.cache_data(ttl=3600, max_entries=2) # Changed to 1 hour (3600s) since targets rarely change
 def get_tb_targets():
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
@@ -63,24 +81,24 @@ def get_tb_targets():
             notified_col: "Target_Notified"
         }, inplace=True)
         
-        return prov_targets, df_muni_targets
+        return prov_targets, compress_memory(df_muni_targets)
     except Exception as e:
         st.error(f"Error loading TB Targets sheet: {e}")
         return {}, pd.DataFrame()
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=600, max_entries=5)
 def load_tb_data(sheet_name):
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
         df = conn.read(spreadsheet=SHEET_URL, worksheet=sheet_name, ttl=600)
         if 'City/Municipality' in df.columns:
             df['Muncity'] = df['City/Municipality'].apply(clean_muni_name)
-        return df
+        return compress_memory(df)
     except Exception as e:
         st.error(f"Error loading {sheet_name}: {e}")
         return pd.DataFrame()
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=600, max_entries=2)
 def get_all_core_tb():
     d26_ds = load_tb_data("2026 DSTB")
     if not d26_ds.empty: d26_ds['Case_Type'] = 'DSTB'
@@ -103,33 +121,33 @@ def get_all_core_tb():
     if not hist.empty: 
         hist['Year'] = pd.to_numeric(hist['Year'], errors='coerce')
     
-    return pd.concat([d26, hist], ignore_index=True)
+    return compress_memory(pd.concat([d26, hist], ignore_index=True))
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=600, max_entries=2)
 def get_all_tpt_data():
     d26 = load_tb_data("2026 TPT")
     if not d26.empty: d26['Year'] = 2026
     h_tpt = load_tb_data("TPT 2021-2025")
     if not h_tpt.empty: h_tpt['Year'] = pd.to_numeric(h_tpt['Year'], errors='coerce')
-    return pd.concat([d26, h_tpt], ignore_index=True)
+    return compress_memory(pd.concat([d26, h_tpt], ignore_index=True))
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=600, max_entries=3)
 def get_aux_tb_data(program, selected_year):
     if program == 'TPT':
         if selected_year == 2026:
             df = load_tb_data("2026 TPT")
             df['Year'] = 2026
-            return df
+            return compress_memory(df)
         else:
             df = load_tb_data("TPT 2021-2025")
             df['Year'] = pd.to_numeric(df['Year'], errors='coerce')
-            return df[df['Year'] == selected_year]
+            return compress_memory(df[df['Year'] == selected_year])
     elif program == 'HIV':
         if selected_year == 2026:
             df = load_tb_data("2026 HIV")
             df['Year'] = 2026
-            return df
+            return compress_memory(df)
         else:
             df = load_tb_data("HIV 2021-2025")
             df['Year'] = pd.to_numeric(df['Year'], errors='coerce')
-            return df[df['Year'] == selected_year]
+            return compress_memory(df[df['Year'] == selected_year])
