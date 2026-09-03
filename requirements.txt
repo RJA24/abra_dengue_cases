@@ -6,3 +6,5 @@ st-gsheets-connection
 openpyxl
 folium
 streamlit-folium
+numpy
+pytz
