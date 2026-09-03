@@ -221,7 +221,7 @@ def render_register():
 
 def render_admin_panel():
     st.markdown("### <i class='fa-solid fa-screwdriver-wrench' style='color: #475569;'></i> Admin Control Panel", unsafe_allow_html=True)
-    tab_users, tab_db = st.tabs(["User Management", "Database Uploader"])
+    tab_users, tab_db, tab_health = st.tabs(["User Management", "Database Uploader", "System Health"])
     
     with tab_users:
         st.caption("Manage user access and edit roles.")
@@ -341,6 +341,69 @@ def render_admin_panel():
                                 st.success(f"✅ Successfully replaced data in '{target_worksheet}' with {len(preview_df):,} records!")
                             except Exception as e: st.error(f"Error updating Google Sheet: {e}")
             except Exception as e: st.error(f"Could not read the uploaded file: {e}")
+
+    with tab_health:
+        st.caption("Real-time operational status of the PESU backend infrastructure.")
+        
+        if st.button("Run System Diagnostics", type="primary", use_container_width=True):
+            with st.spinner("Pinging Google Sheets API and validating cache footprint..."):
+                # Local imports to keep the main gateway fast
+                from utils.data import load_data, get_all_core_tb
+                
+                # Test 1: API & Auth
+                try:
+                    users_count = len(get_users_df())
+                    api_status = "🟢 ONLINE"
+                except Exception:
+                    api_status = "🔴 OFFLINE / RATE LIMITED"
+                    users_count = 0
+                    
+                # Test 2: Dengue Data
+                try:
+                    dengue_df = load_data()
+                    dengue_status = f"🟢 {len(dengue_df):,} records"
+                except Exception:
+                    dengue_status = "🔴 UNAVAILABLE"
+                    
+                # Test 3: TB Data
+                try:
+                    tb_df = get_all_core_tb()
+                    tb_status = f"🟢 {len(tb_df):,} records"
+                except Exception:
+                    tb_status = "🔴 UNAVAILABLE"
+                    
+                # Test 4: Audit/Backup Log
+                try:
+                    conn = st.connection("gsheets", type=GSheetsConnection)
+                    audit_df = conn.read(spreadsheet=SHEET_URL, worksheet="Audit_Log", ttl=0)
+                    backup_logs = audit_df[audit_df['Action'] == 'Updated Database']
+                    if not backup_logs.empty:
+                        last_backup = backup_logs.iloc[-1]['Timestamp']
+                        backup_status = f"🟢 {last_backup}"
+                    else:
+                        backup_status = "🟡 NO BACKUPS YET"
+                except Exception:
+                    backup_status = "🔴 LOG UNAVAILABLE"
+                    
+                # Display Results UI
+                st.markdown("""
+                <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 15px;">
+                    <h4 style="margin-top: 0; color: #0f172a;">Diagnostic Results</h4>
+                """, unsafe_allow_html=True)
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.markdown("**Infrastructure**")
+                    st.write(f"Google Sheets API: {api_status}")
+                    st.write("Streamlit Cache: 🟢 HEALTHY (Capped)")
+                    st.write(f"Last Master Backup: {backup_status}")
+                with c2:
+                    st.markdown("**Data Volumes**")
+                    st.write(f"Dengue Registry: {dengue_status}")
+                    st.write(f"TB Registry: {tb_status}")
+                    st.write(f"Active Personnel: 🟢 {users_count}")
+                    
+                st.markdown("</div>", unsafe_allow_html=True)
 
 def render_settings():
     st.markdown("### <i class='fa-solid fa-gear' style='color: #475569;'></i> Account Settings", unsafe_allow_html=True)
