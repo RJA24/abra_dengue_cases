@@ -10,6 +10,7 @@ from utils.constants import SHEET_URL
 from dengue.dashboard import render_dengue
 from tb.dashboard import render_tb
 from utils.audit import log_action
+from utils.data import load_data, get_all_core_tb
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -301,22 +302,53 @@ def render_main_menu():
     st.markdown("""
     <style>
     .stApp { background: url("https://github.com/RJA24/abra_sia_2026/blob/main/Abra%20(2).png?raw=true") !important; background-size: cover !important; background-position: center !important; background-attachment: fixed !important; }
-    .main-title { text-align: center; font-size: 3.2rem; font-weight: 900; color: #0f172a; margin-top: 10px; margin-bottom: 70px; text-transform: uppercase; letter-spacing: 1.5px; text-shadow: 0px 2px 4px rgba(255,255,255,0.9), 0px 4px 15px rgba(255,255,255,0.7); }
+    .main-title { text-align: center; font-size: 3.2rem; font-weight: 900; color: #0f172a; margin-top: 10px; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1.5px; text-shadow: 0px 2px 4px rgba(255,255,255,0.9), 0px 4px 15px rgba(255,255,255,0.7); }
+    .kpi-container { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); padding: 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.5); box-shadow: 0 8px 32px 0 rgba(0,0,0,0.1); text-align: center; margin-bottom: 30px; }
+    .kpi-value { font-size: 2.5rem; font-weight: 800; color: #0f172a; margin: 0; }
+    .kpi-label { font-size: 1rem; font-weight: 600; color: #475569; text-transform: uppercase; margin: 0; }
     </style>
     <div style='text-align: center; margin-bottom: 10px;'><img src="https://upload.wikimedia.org/wikipedia/commons/1/1a/Abra_provincial_seal.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail_unscaled&_=20170706162937?raw=true" width="100" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.3));"></div>
     <h1 class='main-title'>Abra Provincial Epidemiology<br>and Surveillance Unit</h1>
     """, unsafe_allow_html=True)
     
+    # --- EXECUTIVE SUMMARY DATA FETCH ---
+    with st.spinner("Compiling Provincial Health Summary..."):
+        try:
+            df_dengue = load_data()
+            total_dengue = len(df_dengue)
+            dengue_deaths = len(df_dengue[df_dengue["Outcome"] == "D"]) if "Outcome" in df_dengue.columns else 0
+            
+            df_tb = get_all_core_tb()
+            total_tb_2026 = len(df_tb[df_tb['Year'] == 2026])
+        except Exception:
+            total_dengue, dengue_deaths, total_tb_2026 = 0, 0, 0
+            
+        active_users = len(get_users_df()[get_users_df()['status'] == 'approved']) + 1 # +1 for admin
+    
+    # --- KPI CARDS ---
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.markdown(f"<div class='kpi-container'><p class='kpi-label' style='color:#2563eb;'>Dengue Cases</p><p class='kpi-value'>{total_dengue:,}</p></div>", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"<div class='kpi-container'><p class='kpi-label' style='color:#ef4444;'>Dengue Fatalities</p><p class='kpi-value'>{dengue_deaths:,}</p></div>", unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"<div class='kpi-container'><p class='kpi-label' style='color:#10b981;'>TB Cases (2026)</p><p class='kpi-value'>{total_tb_2026:,}</p></div>", unsafe_allow_html=True)
+    with c4:
+        st.markdown(f"<div class='kpi-container'><p class='kpi-label' style='color:#8b5cf6;'>Active Personnel</p><p class='kpi-value'>{active_users}</p></div>", unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # --- NAVIGATION BUTTONS ---
     _, col1, col2, col3, _ = st.columns([1, 4, 4, 4, 1], gap="medium")
     with col1:
         st.markdown('<span class="big-btn-marker"></span>', unsafe_allow_html=True)
-        if st.button("DENGUE", use_container_width=True): st.session_state.active_program = 'dengue'; st.rerun()
+        if st.button("DENGUE SURVEILLANCE", use_container_width=True): st.session_state.active_program = 'dengue'; st.rerun()
     with col2:
         st.markdown('<span class="big-btn-marker"></span>', unsafe_allow_html=True)
-        if st.button("TUBERCULOSIS", use_container_width=True): st.session_state.active_program = 'tb'; st.rerun()
+        if st.button("TB CONTROL PROGRAM", use_container_width=True): st.session_state.active_program = 'tb'; st.rerun()
     with col3:
         st.markdown('<span class="big-btn-marker"></span>', unsafe_allow_html=True)
-        st.button("NEXT PROGRAM", use_container_width=True)
+        st.button("HIV / NEXT PROGRAM", use_container_width=True)
 
 # ==========================================
 # MAIN ROUTING LOGIC
