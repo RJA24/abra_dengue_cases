@@ -120,6 +120,35 @@ def update_credentials(old_username, new_username, new_password):
     save_users_df(df)
     return True
 
+def backup_worksheet(worksheet_name):
+    """Reads the live data and saves it to the Backup tab."""
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    backup_name = f"Backup_{worksheet_name}"
+    
+    # Read the current live data (ttl=0 ensures we don't grab a cached version)
+    current_df = conn.read(spreadsheet=SHEET_URL, worksheet=worksheet_name, ttl=0)
+    
+    if not current_df.empty:
+        try: conn.clear(spreadsheet=SHEET_URL, worksheet=backup_name)
+        except: pass
+        conn.update(spreadsheet=SHEET_URL, worksheet=backup_name, data=current_df)
+    return len(current_df)
+
+def restore_worksheet(worksheet_name):
+    """Pulls data from the Backup tab and overwrites the live tab."""
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    backup_name = f"Backup_{worksheet_name}"
+    
+    # Read the backup data
+    backup_df = conn.read(spreadsheet=SHEET_URL, worksheet=backup_name, ttl=0)
+    
+    if not backup_df.empty:
+        try: conn.clear(spreadsheet=SHEET_URL, worksheet=worksheet_name)
+        except: pass
+        conn.update(spreadsheet=SHEET_URL, worksheet=worksheet_name, data=backup_df)
+        return len(backup_df)
+    return 0
+
 # ==========================================
 # SESSION STATE INITIALIZATION
 # ==========================================
@@ -224,11 +253,29 @@ def render_admin_panel():
 
     with tab_db:
         st.caption("Upload cumulative 2026 export files to overwrite and update the master Google Sheets.")
-        st.info("💡 **Backup Tip:** Google Sheets automatically saves 'Version History'. If you overwrite data by mistake, you can restore it directly in Google Drive.")
         
         report_mapping = {"Dengue Cases": "Dengue Cases", "2026 MN": "2026 MN", "DSTB": "2026 DSTB", "DRTB": "2026 DRTB", "TPT": "2026 TPT", "HIV": "2026 HIV", "2026 Report 5": "2026 Report 5"}
         selected_report = st.selectbox("1. Select Report to Update", options=list(report_mapping.keys()))
         target_worksheet = report_mapping[selected_report]
+        
+        # --- EMERGENCY RESTORE PANEL ---
+        with st.expander(f"⚠️ Emergency Restore: {target_worksheet}"):
+            st.warning(f"Did you accidentally overwrite **{target_worksheet}** with bad data? You can restore it to the last known good state here.")
+            confirm_restore = st.checkbox(f"I authorize the emergency restoration of {target_worksheet}.")
+            if confirm_restore:
+                if st.button("Restore Last Backup", type="primary"):
+                    with st.spinner("Restoring database..."):
+                        try:
+                            restored_count = restore_worksheet(target_worksheet)
+                            if restored_count > 0:
+                                st.cache_data.clear()
+                                log_action(st.session_state.username, "Restored Backup", f"Reverted {target_worksheet} to previous state ({restored_count} records).")
+                                st.success(f"✅ Successfully restored {restored_count} records to {target_worksheet}!")
+                            else:
+                                st.error("Backup file is empty or corrupted. Cannot restore.")
+                        except Exception as e:
+                            st.error(f"Restoration failed: {e}")
+        # -------------------------------
         
         uploaded_file = st.file_uploader("2. Upload Cumulative Export File (.csv or .xlsx)", type=['csv', 'xlsx'])
         if uploaded_file is not None:
@@ -259,12 +306,19 @@ def render_admin_panel():
                 if report['score'] < 95.0:
                     st.error("This dataset has a low quality score. Are you sure you want to push this to the live database?")
                 
-                # --- SAFETY CATCH ---
+                # --- SAFETY CATCH & BACKUP TRIGGER ---
                 confirm_overwrite = st.checkbox("I verify this data is correct and authorize overwriting the master Google Sheet.")
                 
                 if confirm_overwrite:
-                    if st.button("Overwrite Master Database with this File", type="primary", use_container_width=True):
-                        with st.spinner(f"Updating '{target_worksheet}' in Google Sheets..."):
+                    if st.button("Backup & Overwrite Master Database", type="primary", use_container_width=True):
+                        with st.spinner(f"Step 1/2: Backing up {target_worksheet} to secure vault..."):
+                            try:
+                                backup_count = backup_worksheet(target_worksheet)
+                            except Exception as e:
+                                st.error(f"Backup failed! Halting database overwrite to prevent data loss. Error: {e}")
+                                st.stop()
+                                
+                        with st.spinner(f"Step 2/2: Updating '{target_worksheet}' in live Google Sheets..."):
                             try:
                                 conn = st.connection("gsheets", type=GSheetsConnection)
                                 try: conn.clear(spreadsheet=SHEET_URL, worksheet=target_worksheet)
@@ -272,8 +326,7 @@ def render_admin_panel():
                                 conn.update(spreadsheet=SHEET_URL, worksheet=target_worksheet, data=preview_df)
                                 st.cache_data.clear()
                                 
-                                # Log the massive database update!
-                                log_action(st.session_state.username, "Updated Database", f"Uploaded {len(preview_df)} records to {target_worksheet}. QA Score: {report['score']}%")
+                                log_action(st.session_state.username, "Updated Database", f"Uploaded {len(preview_df)} records to {target_worksheet}. Old data backed up ({backup_count} records). QA Score: {report['score']}%")
                                 
                                 st.success(f"✅ Successfully replaced data in '{target_worksheet}' with {len(preview_df):,} records!")
                             except Exception as e: st.error(f"Error updating Google Sheet: {e}")
