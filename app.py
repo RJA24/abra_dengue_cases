@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import hashlib
 from streamlit_gsheets import GSheetsConnection
+from utils.validation import validate_dataset
 
 # Import our newly modularized dashboards and constants
 from utils.constants import SHEET_URL
@@ -228,10 +229,35 @@ def render_admin_panel():
         if uploaded_file is not None:
             try:
                 preview_df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file)
-                st.write(f"📁 **File Preview:** {len(preview_df):,} rows found.")
-                with st.expander("View first few rows"): st.dataframe(preview_df.head(3), use_container_width=True)
                 
-                if st.button("Clear Old Data & Upload New Records", type="primary", use_container_width=True):
+                # --- RUN DATA QUALITY VALIDATION ---
+                st.markdown("### Data Quality Report")
+                report = validate_dataset(preview_df, selected_report)
+                
+                # Display Score Card
+                score_color = "normal" if report["score"] >= 95 else ("off" if report["score"] >= 80 else "inverse")
+                c1, c2 = st.columns([1, 3])
+                c1.metric("Quality Score", f"{report['score']}%", delta=None, delta_color=score_color)
+                
+                with c2:
+                    if report["score"] == 100.0:
+                        st.success("✅ Perfect Dataset! No missing critical data or duplicates detected.")
+                    else:
+                        st.warning("⚠️ Anomalies Detected in Upload:")
+                        for warning in report["warnings"]:
+                            st.write(f"- {warning}")
+                
+                with st.expander(f"View Data Preview ({len(preview_df):,} rows)"): 
+                    st.dataframe(preview_df.head(10), use_container_width=True)
+                
+                st.markdown("<hr>", unsafe_allow_html=True)
+                # -----------------------------------
+                
+                # Warn user if score is low, but allow override
+                if report['score'] < 95.0:
+                    st.error("This dataset has a low quality score. Are you sure you want to push this to the live database?")
+                
+                if st.button("Overwrite Master Database with this File", type="primary", use_container_width=True):
                     with st.spinner(f"Updating '{target_worksheet}' in Google Sheets..."):
                         try:
                             conn = st.connection("gsheets", type=GSheetsConnection)
