@@ -302,12 +302,22 @@ def render_main_menu():
     st.markdown("""
     <style>
     .stApp { background: url("https://github.com/RJA24/abra_sia_2026/blob/main/Abra%20(2).png?raw=true") !important; background-size: cover !important; background-position: center !important; background-attachment: fixed !important; }
-    .main-title { text-align: center; font-size: 3.2rem; font-weight: 900; color: #0f172a; margin-top: 10px; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1.5px; text-shadow: 0px 2px 4px rgba(255,255,255,0.9), 0px 4px 15px rgba(255,255,255,0.7); }
-    .kpi-container { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); padding: 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.5); box-shadow: 0 8px 32px 0 rgba(0,0,0,0.1); text-align: center; margin-bottom: 30px; }
-    .kpi-value { font-size: 2.5rem; font-weight: 800; color: #0f172a; margin: 0; }
-    .kpi-label { font-size: 1rem; font-weight: 600; color: #475569; text-transform: uppercase; margin: 0; }
+    
+    /* Slightly smaller title to let the page breathe */
+    .main-title { text-align: center; font-size: 2.8rem; font-weight: 900; color: #0f172a; margin-top: 5px; margin-bottom: 40px; text-transform: uppercase; letter-spacing: 1.5px; text-shadow: 0px 2px 4px rgba(255,255,255,0.9), 0px 4px 15px rgba(255,255,255,0.7); }
+    
+    /* Sleeker, more transparent KPI cards */
+    .kpi-container { background: rgba(255, 255, 255, 0.65); backdrop-filter: blur(8px); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.4); box-shadow: 0 4px 15px 0 rgba(0,0,0,0.05); text-align: center; margin-bottom: 45px; transition: transform 0.2s; }
+    .kpi-container:hover { transform: translateY(-3px); background: rgba(255, 255, 255, 0.85); }
+    .kpi-value { font-size: 2.2rem; font-weight: 800; color: #0f172a; margin: 0; }
+    .kpi-label { font-size: 0.85rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 1px; margin: 0; }
+    
+    /* Override the giant button CSS specifically for this page to make text fit */
+    div.element-container:has(.big-btn-marker) + div.element-container button { height: 80px !important; border-radius: 40px !important; }
+    div.element-container:has(.big-btn-marker) + div.element-container button p { font-size: 16px !important; letter-spacing: 1px !important; }
     </style>
-    <div style='text-align: center; margin-bottom: 10px;'><img src="https://upload.wikimedia.org/wikipedia/commons/1/1a/Abra_provincial_seal.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail_unscaled&_=20170706162937?raw=true" width="100" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.3));"></div>
+    
+    <div style='text-align: center; margin-bottom: 5px;'><img src="https://upload.wikimedia.org/wikipedia/commons/1/1a/Abra_provincial_seal.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail_unscaled&_=20170706162937?raw=true" width="90" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.3));"></div>
     <h1 class='main-title'>Abra Provincial Epidemiology<br>and Surveillance Unit</h1>
     """, unsafe_allow_html=True)
     
@@ -321,17 +331,16 @@ def render_main_menu():
             df_tb = get_all_core_tb()
             total_tb_2026 = len(df_tb[df_tb['Year'] == 2026])
             
-            # Pull the data ONCE to avoid API rate limits
             users_df = get_users_df()
             active_users = len(users_df[users_df['status'] == 'approved']) + 1 
             
         except Exception as e:
-            # If Google API throttles us, fail gracefully without crashing
             print(f"API Dashboard Fetch Error: {e}")
             total_dengue, dengue_deaths, total_tb_2026, active_users = 0, 0, 0, 1
     
     # --- KPI CARDS ---
-    c1, c2, c3, c4 = st.columns(4)
+    # Wrap in columns with tiny outer margins so they center nicely but stay wide
+    _, c1, c2, c3, c4, _ = st.columns([0.2, 2, 2, 2, 2, 0.2])
     with c1:
         st.markdown(f"<div class='kpi-container'><p class='kpi-label' style='color:#2563eb;'>Dengue Cases</p><p class='kpi-value'>{total_dengue:,}</p></div>", unsafe_allow_html=True)
     with c2:
@@ -340,11 +349,10 @@ def render_main_menu():
         st.markdown(f"<div class='kpi-container'><p class='kpi-label' style='color:#10b981;'>TB Cases (2026)</p><p class='kpi-value'>{total_tb_2026:,}</p></div>", unsafe_allow_html=True)
     with c4:
         st.markdown(f"<div class='kpi-container'><p class='kpi-label' style='color:#8b5cf6;'>Active Personnel</p><p class='kpi-value'>{active_users}</p></div>", unsafe_allow_html=True)
-    
-    st.markdown("<br>", unsafe_allow_html=True)
 
     # --- NAVIGATION BUTTONS ---
-    _, col1, col2, col3, _ = st.columns([1, 4, 4, 4, 1], gap="medium")
+    # Shrunk the spacer columns (the 0.5s) and expanded the button columns (the 4s) so the text fits comfortably
+    _, col1, col2, col3, _ = st.columns([0.5, 4, 4, 4, 0.5], gap="large")
     with col1:
         st.markdown('<span class="big-btn-marker"></span>', unsafe_allow_html=True)
         if st.button("DENGUE SURVEILLANCE", use_container_width=True): st.session_state.active_program = 'dengue'; st.rerun()
