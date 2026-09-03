@@ -9,6 +9,7 @@ from utils.validation import validate_dataset
 from utils.constants import SHEET_URL
 from dengue.dashboard import render_dengue
 from tb.dashboard import render_tb
+from utils.audit import log_action
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -202,6 +203,7 @@ def render_admin_panel():
                             if selected_role != row['role']:
                                 if st.button("Save New Role", key=f"save_role_{row['username']}"):
                                     update_user_role(row['username'], selected_role)
+                                    log_action(st.session_state.username, "Changed Role", f"Updated {row['username']} to {selected_role}")
                                     st.rerun()
                         with col_actions:
                             c1, c2 = st.columns(2)
@@ -209,10 +211,12 @@ def render_admin_panel():
                                 if row['status'] == 'pending' and st.button("Approve", key=f"app_{row['username']}", use_container_width=True):
                                     update_user_status(row['username'], 'approved')
                                     update_user_role(row['username'], selected_role)
+                                    log_action(st.session_state.username, "Approved User", f"Granted access to {row['username']}")
                                     st.rerun()
                             with c2:
                                 if st.button("Delete User", key=f"del_{row['username']}", use_container_width=True):
                                     delete_user(row['username'])
+                                    log_action(st.session_state.username, "Deleted User", f"Removed account: {row['username']}")
                                     st.rerun()
                         st.markdown("---")
             else: st.info("No other users found in the database.")
@@ -220,10 +224,11 @@ def render_admin_panel():
 
     with tab_db:
         st.caption("Upload cumulative 2026 export files to overwrite and update the master Google Sheets.")
+        st.info("💡 **Backup Tip:** Google Sheets automatically saves 'Version History'. If you overwrite data by mistake, you can restore it directly in Google Drive.")
+        
         report_mapping = {"Dengue Cases": "Dengue Cases", "2026 MN": "2026 MN", "DSTB": "2026 DSTB", "DRTB": "2026 DRTB", "TPT": "2026 TPT", "HIV": "2026 HIV", "2026 Report 5": "2026 Report 5"}
         selected_report = st.selectbox("1. Select Report to Update", options=list(report_mapping.keys()))
         target_worksheet = report_mapping[selected_report]
-        st.info(f"Target Google Sheet Tab: **{target_worksheet}**")
         
         uploaded_file = st.file_uploader("2. Upload Cumulative Export File (.csv or .xlsx)", type=['csv', 'xlsx'])
         if uploaded_file is not None:
@@ -234,7 +239,6 @@ def render_admin_panel():
                 st.markdown("### Data Quality Report")
                 report = validate_dataset(preview_df, selected_report)
                 
-                # Display Score Card
                 score_color = "normal" if report["score"] >= 95 else ("off" if report["score"] >= 80 else "inverse")
                 c1, c2 = st.columns([1, 3])
                 c1.metric("Quality Score", f"{report['score']}%", delta=None, delta_color=score_color)
@@ -251,22 +255,28 @@ def render_admin_panel():
                     st.dataframe(preview_df.head(10), use_container_width=True)
                 
                 st.markdown("<hr>", unsafe_allow_html=True)
-                # -----------------------------------
                 
-                # Warn user if score is low, but allow override
                 if report['score'] < 95.0:
                     st.error("This dataset has a low quality score. Are you sure you want to push this to the live database?")
                 
-                if st.button("Overwrite Master Database with this File", type="primary", use_container_width=True):
-                    with st.spinner(f"Updating '{target_worksheet}' in Google Sheets..."):
-                        try:
-                            conn = st.connection("gsheets", type=GSheetsConnection)
-                            try: conn.clear(spreadsheet=SHEET_URL, worksheet=target_worksheet)
-                            except: pass
-                            conn.update(spreadsheet=SHEET_URL, worksheet=target_worksheet, data=preview_df)
-                            st.cache_data.clear()
-                            st.success(f"✅ Successfully replaced data in '{target_worksheet}' with {len(preview_df):,} records!")
-                        except Exception as e: st.error(f"Error updating Google Sheet: {e}")
+                # --- SAFETY CATCH ---
+                confirm_overwrite = st.checkbox("I verify this data is correct and authorize overwriting the master Google Sheet.")
+                
+                if confirm_overwrite:
+                    if st.button("Overwrite Master Database with this File", type="primary", use_container_width=True):
+                        with st.spinner(f"Updating '{target_worksheet}' in Google Sheets..."):
+                            try:
+                                conn = st.connection("gsheets", type=GSheetsConnection)
+                                try: conn.clear(spreadsheet=SHEET_URL, worksheet=target_worksheet)
+                                except: pass
+                                conn.update(spreadsheet=SHEET_URL, worksheet=target_worksheet, data=preview_df)
+                                st.cache_data.clear()
+                                
+                                # Log the massive database update!
+                                log_action(st.session_state.username, "Updated Database", f"Uploaded {len(preview_df)} records to {target_worksheet}. QA Score: {report['score']}%")
+                                
+                                st.success(f"✅ Successfully replaced data in '{target_worksheet}' with {len(preview_df):,} records!")
+                            except Exception as e: st.error(f"Error updating Google Sheet: {e}")
             except Exception as e: st.error(f"Could not read the uploaded file: {e}")
 
 def render_settings():
