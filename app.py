@@ -1,7 +1,7 @@
 # app.py
 import streamlit as st
 import pandas as pd
-import hashlib
+import bcrypt
 from streamlit_gsheets import GSheetsConnection
 from utils.validation import validate_dataset
 
@@ -66,7 +66,16 @@ def save_users_df(df):
     conn.update(spreadsheet=SHEET_URL, worksheet="Users", data=df)
 
 def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+    """Hashes a password using bcrypt with a unique salt."""
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+
+def check_password(password, stored_hash):
+    """Verifies a password against a bcrypt hash."""
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), stored_hash.encode('utf-8'))
+    except ValueError:
+        return False # Fails gracefully if the stored hash is invalid or an old SHA-256 hash
 
 def create_user(username, password):
     df = get_users_df()
@@ -77,7 +86,7 @@ def create_user(username, password):
     return True
 
 def authenticate(username, password):
-    # Secure Master Admin Check
+    # Secure Master Admin Check (Uses secrets, bypasses the database)
     master_user = st.secrets["MASTER_ADMIN_USER"]
     master_pass = st.secrets["MASTER_ADMIN_PASS"]
     
@@ -88,7 +97,8 @@ def authenticate(username, password):
     df = get_users_df()
     user_row = df[df['username'] == username.strip()]
     if not user_row.empty:
-        if user_row.iloc[0]['password'] == hash_password(password):
+        stored_hash = user_row.iloc[0]['password']
+        if check_password(password, stored_hash):
             return user_row.iloc[0]['role'], user_row.iloc[0]['status']
     return None, None
 
