@@ -75,8 +75,14 @@ def create_user(username, password):
     return True
 
 def authenticate(username, password):
-    if username.strip() == 'admin' and password == 'admin123':
+    # Secure Master Admin Check
+    master_user = st.secrets["MASTER_ADMIN_USER"]
+    master_pass = st.secrets["MASTER_ADMIN_PASS"]
+    
+    if username.strip() == master_user and password == master_pass:
         return 'admin', 'approved'
+        
+    # Standard User Check
     df = get_users_df()
     user_row = df[df['username'] == username.strip()]
     if not user_row.empty:

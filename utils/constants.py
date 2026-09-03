@@ -1,6 +1,8 @@
 # utils/constants.py
+import streamlit as st
 
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1IHdlNfzNtBAOk3LlDN2LstxlRmoGQNTRgF7vZ2P_t4U"
+# Securely fetch the URL from Streamlit Secrets
+SHEET_URL = st.secrets["PESU_SHEET_URL"]
 
 ALL_ABRA_MUNICIPALITIES = [
     "BANGUED", "BOLINEY", "BUCAY", "BUCLOC", "DAGUIOMAN", "DANGLAS", "DOLORES",
