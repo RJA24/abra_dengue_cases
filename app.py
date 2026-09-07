@@ -476,7 +476,7 @@ def main():
         with st.sidebar:
             st.markdown(f"""
             <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0; margin-bottom: 15px;">
-                <img src="{profile_img_url}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: contain; margin-bottom: 10px; background-color: #f8fafc; padding: 5px; border: 1px solid #e2e8f0;">
+                <img src="{profile_img_url}" style="width: 85px; object-fit: contain;">
                 <h3 style="margin: 0; color: #0f172a; font-size: 1.2rem;">{st.session_state.username}</h3>
                 <p style="margin: 0; color: #64748b; font-size: 0.9rem;">{st.session_state.role.title()}</p>
             </div>
