@@ -16,7 +16,7 @@ st.set_page_config(
     page_title="Abra PESU Portal", 
     page_icon="https://github.com/RJA24/abra_sia_2026/blob/main/PHO%20logo.png?raw=true", 
     layout="wide", 
-    initial_sidebar_state="auto"
+    initial_sidebar_state="expanded"
 )
 
 # Inject FontAwesome Library
@@ -457,9 +457,8 @@ def render_main_menu():
             
     with col3:
         st.markdown('<span class="big-btn-marker"></span>', unsafe_allow_html=True)
-        if st.button("SYSTEM ADMINISTRATION", use_container_width=True): 
-            st.session_state.current_page = 'admin'
-            st.rerun()
+        if st.button("NEXT PROGRAM", use_container_width=True): 
+            st.info("New program module coming soon.")
 
 # ==========================================
 # MAIN ROUTING LOGIC
