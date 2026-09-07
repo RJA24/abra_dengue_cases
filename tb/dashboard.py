@@ -194,7 +194,7 @@ def render_tb():
             st.warning("Could not find 'Date of Notification' or 'Date of Diagnosis' in the dataset.")
 
     with tab2:
-        st.subheader(f"Program Performance Overview ({selected_year})")
+        st.subheader(f"Program Performance Ooverview ({selected_year})")
         st.markdown("---")
         
         # Determine geographic grouping based on sidebar filter
