@@ -310,6 +310,10 @@ def render_tb():
                 if "Outcome Reason" in df_died.columns: mort_counts = df_died["Outcome Reason"].fillna("Unspecified").value_counts().reset_index()
                 else: mort_counts = pd.DataFrame({"Outcome Reason": ["Unspecified"], "count": [len(df_died)]})
                 mort_counts.columns = ["Reason", "Count"]
+                
+                # Remove any entries with 0 counts so they do not appear in the legend
+                mort_counts = mort_counts[mort_counts["Count"] > 0]
+                
                 total_deaths = mort_counts["Count"].sum()
                 
                 fig_mort_donut = px.pie(mort_counts, names="Reason", values="Count", hole=0.55, color_discrete_sequence=["#ef4444", "#f97316", "#dc2626", "#8b5cf6"])
@@ -324,6 +328,7 @@ def render_tb():
         with c3_right:
             if not df_died.empty and geo_col in df_died.columns:
                 geo_deaths = df_died.groupby(geo_col).size().reset_index(name="Deaths").sort_values("Deaths", ascending=True)
+                geo_deaths = geo_deaths[geo_deaths["Deaths"] > 0] # Also keep 0s off the bar chart
                 fig_mort_bar = px.bar(geo_deaths, x="Deaths", y=geo_col, orientation="h", text_auto=True, color_discrete_sequence=["#ef4444"])
                 fig_mort_bar.update_layout(height=max(350, len(geo_deaths)*25), margin=dict(t=10, b=10, l=10, r=10), xaxis_title="Total Deaths", yaxis_title="")
                 st.plotly_chart(fig_mort_bar, use_container_width=True)
