@@ -161,8 +161,23 @@ def render_tb():
 
         st.markdown("<hr>", unsafe_allow_html=True)
         st.subheader(f"Monthly Case Detection ({selected_year})")
-        if "Date of Diagnosis" in df_combined.columns and not df_combined.empty:
-            df_combined['Diag_Date'] = pd.to_datetime(df_combined['Date of Diagnosis'], errors='coerce')
+        
+        # 1. Prioritize Date of Notification, fallback to Date of Diagnosis
+        date_col = None
+        if "Date of Notification" in df_combined.columns:
+            date_col = "Date of Notification"
+        elif "Date of Diagnosis" in df_combined.columns:
+            date_col = "Date of Diagnosis"
+            
+        if date_col and not df_combined.empty:
+            # 2. Use dayfirst=True to prevent 10/05/2026 (May 10) from becoming Oct 5
+            df_combined['Diag_Date'] = pd.to_datetime(df_combined[date_col], errors='coerce', dayfirst=True)
+            
+            # 3. Filter out any impossible future dates (accidental typos by encoders)
+            import datetime
+            current_date = pd.to_datetime(datetime.date.today())
+            df_combined.loc[df_combined['Diag_Date'] > current_date, 'Diag_Date'] = pd.NaT 
+
             df_combined['Month'] = df_combined['Diag_Date'].dt.month
             month_map = {1:'Jan', 2:'Feb', 3:'Mar', 4:'Apr', 5:'May', 6:'Jun', 7:'Jul', 8:'Aug', 9:'Sep', 10:'Oct', 11:'Nov', 12:'Dec'}
             
@@ -173,7 +188,10 @@ def render_tb():
                 fig_trend = px.bar(monthly_trend, x='Month Name', y='Cases', color='Case_Type', text_auto=True, color_discrete_map=CASE_COLORS)
                 fig_trend.update_layout(height=400, xaxis_title="Month", yaxis_title="Number of Cases")
                 st.plotly_chart(fig_trend, use_container_width=True)
-            else: st.info(f"Insufficient date data for monthly trend analysis in {selected_year}.")
+            else: 
+                st.info(f"Insufficient date data for monthly trend analysis in {selected_year}.")
+        else:
+            st.warning("Could not find 'Date of Notification' or 'Date of Diagnosis' in the dataset.")
 
     with tab2:
         st.subheader(f"Program Performance Overview ({selected_year})")
