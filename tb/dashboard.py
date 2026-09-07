@@ -236,9 +236,14 @@ def render_tb():
             if not df_combined.empty and "Case_Type" in df_combined.columns:
                 case_counts = df_combined["Case_Type"].value_counts().reset_index()
                 case_counts.columns = ["Case Type", "Count"]
+                total_cases_donut = case_counts["Count"].sum()
+                
                 fig_tc_donut = px.pie(case_counts, names="Case Type", values="Count", hole=0.55, color="Case Type", color_discrete_map={"DSTB": "#3b82f6", "DRTB": "#ef4444", "MN": "#f59e0b"})
                 fig_tc_donut.update_traces(textinfo='value')
-                fig_tc_donut.update_layout(height=350, margin=dict(t=10, b=10, l=10, r=10), showlegend=True, legend=dict(orientation="h", y=-0.1))
+                fig_tc_donut.update_layout(
+                    height=350, margin=dict(t=10, b=10, l=10, r=10), showlegend=True, legend=dict(orientation="h", y=-0.1),
+                    annotations=[dict(text=f"<b>{total_cases_donut:,}</b>", x=0.5, y=0.5, font=dict(size=36, color="#0f172a"), showarrow=False)]
+                )
                 st.plotly_chart(fig_tc_donut, use_container_width=True)
             else: st.info("No case data.")
                 
@@ -305,9 +310,14 @@ def render_tb():
                 if "Outcome Reason" in df_died.columns: mort_counts = df_died["Outcome Reason"].fillna("Unspecified").value_counts().reset_index()
                 else: mort_counts = pd.DataFrame({"Outcome Reason": ["Unspecified"], "count": [len(df_died)]})
                 mort_counts.columns = ["Reason", "Count"]
+                total_deaths = mort_counts["Count"].sum()
+                
                 fig_mort_donut = px.pie(mort_counts, names="Reason", values="Count", hole=0.55, color_discrete_sequence=["#ef4444", "#f97316", "#dc2626", "#8b5cf6"])
                 fig_mort_donut.update_traces(textinfo='value')
-                fig_mort_donut.update_layout(height=350, margin=dict(t=10, b=10, l=10, r=10), showlegend=True, legend=dict(orientation="h", y=-0.1))
+                fig_mort_donut.update_layout(
+                    height=350, margin=dict(t=10, b=10, l=10, r=10), showlegend=True, legend=dict(orientation="h", y=-0.1),
+                    annotations=[dict(text=f"<b>{total_deaths:,}</b>", x=0.5, y=0.5, font=dict(size=36, color="#0f172a"), showarrow=False)]
+                )
                 st.plotly_chart(fig_mort_donut, use_container_width=True)
             else: st.success(f"No deaths recorded.")
                 
@@ -335,9 +345,16 @@ def render_tb():
             if not df_2025.empty and "Outcome/Status" in df_2025.columns:
                 outcomes = df_2025["Outcome/Status"].fillna("Unknown").value_counts().reset_index()
                 outcomes.columns = ["Outcome", "Count"]
+                
+                success_outcomes = df_2025[df_2025["Outcome/Status"].str.upper().isin(["CURED", "TREATMENT COMPLETED"])]
+                success_rate = (len(success_outcomes) / len(df_2025) * 100) if len(df_2025) > 0 else 0
+                
                 fig_ts_donut = px.pie(outcomes, names="Outcome", values="Count", hole=0.55, color_discrete_sequence=["#10b981", "#3b82f6", "#facc15", "#ec4899", "#64748b"])
                 fig_ts_donut.update_traces(textinfo='percent')
-                fig_ts_donut.update_layout(height=350, margin=dict(t=10, b=10, l=10, r=10), showlegend=True, legend=dict(orientation="h", y=-0.1))
+                fig_ts_donut.update_layout(
+                    height=350, margin=dict(t=10, b=10, l=10, r=10), showlegend=True, legend=dict(orientation="h", y=-0.1),
+                    annotations=[dict(text=f"<b>{success_rate:.1f}%</b>", x=0.5, y=0.5, font=dict(size=36, color="#0f172a"), showarrow=False)]
+                )
                 st.plotly_chart(fig_ts_donut, use_container_width=True)
             else: st.info("Awaiting 2025 outcome records.")
                 
@@ -365,7 +382,6 @@ def render_tb():
         c5_left, c5_right = st.columns([1, 2], gap="large")
         
         with c5_left:
-            # Create a Donut chart showing Target Reached vs Remaining
             remaining_target = max(0, active_notified_target - total_notified_cases)
             cdr_data = pd.DataFrame({"Status": ["Cases Detected", "Target Remaining"], "Count": [total_notified_cases, remaining_target]})
             fig_cdr_donut = px.pie(cdr_data, names="Status", values="Count", hole=0.55, color="Status", color_discrete_map={"Cases Detected": "#10b981", "Target Remaining": "#e2e8f0"})
