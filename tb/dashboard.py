@@ -415,6 +415,79 @@ def render_tb():
                 fig_cdr_bar.update_layout(height=max(350, len(geo_cases)*25), margin=dict(t=10, b=10, l=10, r=10), xaxis_title="Raw Cases", yaxis_title="")
                 st.plotly_chart(fig_cdr_bar, use_container_width=True)
 
+        # ==========================================
+        # 6. TB-HIV COLLABORATIVE ACTIVITIES
+        # ==========================================
+        st.markdown("### 6. TB-HIV Collaboration")
+        st.caption("HIV Testing Coverage for Eligible TB Patients (15+ yrs)")
+        
+        c6_left, c6_right = st.columns([1, 2], gap="large")
+        
+        if not df_hiv.empty:
+            num_col = "All Reg Group 15 above TB Cases Tested or with Known HIV Status"
+            den_col = "All Reg Group 15 above TB Cases"
+            
+            if num_col in df_hiv.columns and den_col in df_hiv.columns:
+                # 1. Handle filtering if a specific municipality is selected
+                df_hiv_filtered = df_hiv.copy()
+                hiv_geo = geo_col if geo_col in df_hiv_filtered.columns else ("Facility" if "Facility" in df_hiv_filtered.columns else None)
+                
+                if muncity_input != "All Municipalities" and hiv_geo:
+                    df_hiv_filtered = df_hiv_filtered[df_hiv_filtered[hiv_geo].astype(str).str.upper().str.contains(muncity_input.upper(), na=False)]
+                
+                total_eligible = df_hiv_filtered[den_col].sum()
+                total_tested = df_hiv_filtered[num_col].sum()
+                untested = max(0, total_eligible - total_tested)
+                testing_rate = (total_tested / total_eligible * 100) if total_eligible > 0 else 0
+                
+                with c6_left:
+                    if total_eligible > 0:
+                        hiv_data = pd.DataFrame({
+                            "Status": ["Tested for HIV", "Untested"], 
+                            "Count": [total_tested, untested]
+                        })
+                        hiv_data = hiv_data[hiv_data["Count"] > 0] # Hide 0s from the legend
+                        
+                        fig_hiv_donut = px.pie(
+                            hiv_data, names="Status", values="Count", hole=0.55, 
+                            color="Status", color_discrete_map={"Tested for HIV": "#8b5cf6", "Untested": "#e2e8f0"}
+                        )
+                        fig_hiv_donut.update_traces(textinfo='none', hoverinfo='label+value')
+                        fig_hiv_donut.update_layout(
+                            height=350, margin=dict(t=10, b=10, l=10, r=10), showlegend=True, legend=dict(orientation="h", y=-0.1),
+                            annotations=[dict(text=f"<b>{testing_rate:.1f}%</b>", x=0.5, y=0.5, font=dict(size=30, color="#0f172a"), showarrow=False)]
+                        )
+                        st.plotly_chart(fig_hiv_donut, use_container_width=True)
+                        st.markdown(f"<div style='text-align:center; color:#64748b;'>Eligible: {int(total_eligible):,}</div>", unsafe_allow_html=True)
+                    else:
+                        st.info("No eligible patients found for the selected filters.")
+
+                with c6_right:
+                    if hiv_geo and total_eligible > 0:
+                        hiv_grouped = df_hiv_filtered.groupby(hiv_geo)[[num_col, den_col]].sum().reset_index()
+                        hiv_grouped = hiv_grouped[hiv_grouped[den_col] > 0] # Only show facilities with eligible patients
+                        hiv_grouped["Coverage %"] = (hiv_grouped[num_col] / hiv_grouped[den_col] * 100).fillna(0)
+                        hiv_grouped = hiv_grouped.sort_values("Coverage %", ascending=True)
+                        
+                        if not hiv_grouped.empty:
+                            fig_hiv_bar = px.bar(
+                                hiv_grouped, x="Coverage %", y=hiv_geo, orientation="h", 
+                                text_auto=".1f", color_discrete_sequence=["#8b5cf6"]
+                            )
+                            fig_hiv_bar.update_layout(
+                                height=max(350, len(hiv_grouped)*25), margin=dict(t=10, b=10, l=10, r=10), 
+                                xaxis=dict(title="Coverage (%)", range=[0, 100]), yaxis_title=""
+                            )
+                            st.plotly_chart(fig_hiv_bar, use_container_width=True)
+                    elif not hiv_geo:
+                        st.info("Geographic breakdown not available for HIV data.")
+            else:
+                st.error("HIV Data columns do not match the expected format.")
+        else:
+            st.info(f"No HIV data available for {selected_year}.")
+        
+        st.markdown("<hr style='margin: 30px 0; border: none; border-bottom: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+
     with tab3:
         st.subheader(f"Demographic Distribution ({selected_year})")
         if "Muncity" in df_combined.columns and muncity_input == "All Municipalities":
