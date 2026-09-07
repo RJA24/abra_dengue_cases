@@ -285,7 +285,7 @@ def render_tb():
                 
                 fig_cnr_bar = px.bar(df_cnr_muni, x="CNR", y="Muncity", orientation="h", text_auto=".1f", color_discrete_sequence=["#3b82f6"])
                 fig_cnr_bar.update_layout(height=max(350, len(df_cnr_muni)*25), margin=dict(t=10, b=10, l=10, r=10), xaxis_title="CNR per 100k", yaxis_title="")
-                st.plotly_chart(fig_cnr_bar, use_container_width=True)
+                st.plotly_chart(fig_cnr_bar, use_container_width=True, key="cnr_fallback_bar")
             elif not df_combined.empty:
                 st.info(f"Showing case volume per {geo_label} (Barangay population targets unavailable for true rate calculation).")
                 geo_cases = df_combined.groupby(geo_col).size().reset_index(name="Count").sort_values("Count", ascending=True)
@@ -407,7 +407,7 @@ def render_tb():
                 
                 fig_cdr_bar = px.bar(df_cdr_muni, x="CDR %", y="Muncity", orientation="h", text_auto=".1f", color_discrete_sequence=["#10b981"])
                 fig_cdr_bar.update_layout(height=max(350, len(df_cdr_muni)*25), margin=dict(t=10, b=10, l=10, r=10), xaxis_title="Accomplishment (%)", yaxis_title="")
-                st.plotly_chart(fig_cdr_bar, use_container_width=True)
+                st.plotly_chart(fig_cdr_bar, use_container_width=True, key="cdr_fallback_bar")
             elif not df_combined.empty:
                 st.info(f"Showing case volume contribution per {geo_label}.")
                 geo_cases = df_combined.groupby(geo_col).size().reset_index(name="Count").sort_values("Count", ascending=True)
