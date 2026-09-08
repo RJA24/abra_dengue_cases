@@ -1,1 +1,4 @@
 .streamlit/secrets.toml
+venv
+dengue/__pycache__
+tb/__pycache__
